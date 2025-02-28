@@ -139,7 +139,7 @@ def main():
     apis = read_json(apis_path)
     players = []
     for i in range(len(roles)):
-        players.append(Player("qwen-max",roles[i],i+1))
+        players.append(Player(use_model,roles[i],i+1))
     Context(0,"这是一局有7个玩家的狼人杀，分别有2个狼人，3个村民，一个预言家和一个女巫",get_all_players())
     while True:
         ins = input("\n请输入指令:")
@@ -190,6 +190,7 @@ def main():
             print(e)
 
 if __name__ == "__main__":
+
     logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
     logger.setLevel(level = logging.INFO)
@@ -199,9 +200,9 @@ if __name__ == "__main__":
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-
     instructions_path = "instructions.json"
     apis_path = "apis.json"
+    use_model = "qwen-max"
     roles = ["werewolf"]*2 + ["villager"]*3 + ["witch", "seer"]
     # -1为系统提示词，0为上帝，1、2狼人，3、4、5村民，6女巫，7预言家
     game_name = input("请输入游戏名称：")
