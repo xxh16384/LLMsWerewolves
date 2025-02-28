@@ -1,27 +1,86 @@
 from openai import OpenAI
 import json
-import re
+import logging
+
+logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+logger.setLevel(level = logging.INFO)
+handler = logging.FileHandler("log.txt",encoding="UTF-8")
+handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
 
 instructions_path = "instructions.json"
 apis_path = "apis.json"
 roles = ["werewolf"]*2 + ["villager"]*3 + ["witch", "seer"]
-# 0为上帝，1、2狼人，3、4、5村民，6女巫，7预言家
-#   阿斯顿
+# -1为系统提示词，0为上帝，1、2狼人，3、4、5村民，6女巫，7预言家
+
 def read_json(file_path):
     with open(file_path,"r",encoding="UTF-8") as f:
         return json.load(f)
 
-def extract_bracket_content(text):
-    # 使用正则表达式查找所有符合模式的字符串
-    matches = re.findall(r'$(\d+)$', text)
-    return matches
+def extract_numbers_from_brackets(text):
+    # 初始化一个空列表来存储找到的数字
+    numbers = []
+    
+    # 查找文本中所有的“[” 和 “]”
+    start = text.find('[')
+    while start != -1:
+        # 找到对应的"]"
+        end = text.find(']', start)
+        if end != -1:
+            # 提取方括号之间的内容并尝试转换为整数
+            try:
+                number = int(text[start + 1:end])
+                numbers.append(number)
+            except ValueError:
+                print(f"在位置 {start} 到 {end} 之间未找到有效的数字")
+        else:
+            print("找到了'['但没有对应的']'")
+            break
+        
+        # 继续查找下一个"["
+        start = text.find('[', end)
+
+    return numbers
 
 pub_messages = []
 def broadcast(source_id,content):
     if source_id == 0:
         pub_messages.append(f"上帝：{content}")
+        logger.info(f"上帝：{content}")
     else:
         pub_messages.append(f"{source_id}号玩家：{content}")
+        logger.info(f"玩家{source_id}：{content}")
+
+class Content:
+    contents = []
+    def __init__(self,source_id,content,visible_ids = []):
+        self.source_id = source_id
+        self.content = content
+        self.visible_ids = visible_ids + [source_id] if visible_ids else source_id
+        Content.contents.append(self)
+
+    def get_content(self,id):
+        messages = []
+        for i in Content.contents:
+            if i.source_id == id: #自己说的
+                pass
+            elif id in i.visible_ids: #别人说的但自己可见
+                if i.source_id == -1:
+                    messages.append({"role":"system","content":str(i)})
+                else:
+                    messages.append({"role":"assistant","content":str(i)})
+
+
+    def __str__(self):
+        if self.source_id == 0:
+            return f"上帝:{self.content}\n"
+        elif self.source_id == -1:
+            return f"系统提示:{self.content}\n"
+        return f"{self.source_id}号玩家:{self.content}\n"
 
 class Player:
     def __init__(self,model,role,id):
@@ -38,6 +97,7 @@ class Player:
         self.prompt = pre_instruction
 
     def get_response(self,if_pub):
+        print(f"\n玩家{self.id}： ", end="", flush=True)
         prompt0 = self.prompt
         if if_pub:
             self.prompt = f"\n此前的公共信息如下：{str(pub_messages)}...注意：你现在在公共发言阶段，你的所有输出会被所有玩家听到，请直接口语化的输出你想表达的信息，不要暴露你的意图。（连括号中的内容也会被看到）" + self.prompt
@@ -55,7 +115,7 @@ class Player:
 
         collected_messages = ""
         if self.model == "deepseek-r1":
-            print(f"\n玩家{self.id}正在思考： ", end="", flush=True)
+            print(f"正在思考： ", end="", flush=True)
             reasoning = True
         else:
             reasoning = False
@@ -75,6 +135,8 @@ class Player:
         self.messages.append({"role": "assistant", "content": collected_messages})
         if if_pub:
             broadcast(self.id,collected_messages)
+        else:
+            logger.info(f"玩家{self.id}：{collected_messages}")
 
     def private_chat(self,source_id,content):
         if source_id == 0:
@@ -98,7 +160,7 @@ def main():
     apis = read_json(apis_path)
     players = []
     for i in range(len(roles)):
-        players.append(Player("qwen-max",roles[i],i+1))
+        players.append(Player("deepseek-r1",roles[i],i+1))
     broadcast(0,"这是一局有7个玩家的狼人杀，分别有2个狼人，3个村民，一个预言家和一个女巫")
     while True:
         ins = input("\n请输入指令:")
@@ -129,9 +191,15 @@ def main():
                 content = "请投票，投票结果用[]包围，其中只包含编号数字，例如[1]"
                 for i in player_ids:
                     players[i-1].pub_chat(0,content)
+                result = {i:0 for i in player_ids}
                 for i in player_ids:
-                    
-                    players[i-1].messages[-1]
+                    voted = extract_numbers_from_brackets(players[i-1].messages[-1]['content'])
+                    if voted and int(voted[0]) in player_ids:
+                        result[int(voted[0])] += 1
+                logger.info(f"投票结果：{result}")
+            elif ins == "wolf_discuss":
+                input_str = input("请输入讨论玩家编号：")
+                player_ids = [int(i) for i in input_str.split(",")] if not input_str == "" else [i for i in range(1,len(roles)+1) if players[i-1].role == "werewolf"]
             else:
                 print("无效指令，请重新输入")
         except Exception as e:
