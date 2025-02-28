@@ -6,7 +6,7 @@ instructions_path = "instructions.json"
 apis_path = "apis.json"
 roles = ["werewolf"]*2 + ["villager"]*3 + ["witch", "seer"]
 # 0为上帝，1、2狼人，3、4、5村民，6女巫，7预言家
-
+#   阿斯顿
 def read_json(file_path):
     with open(file_path,"r",encoding="UTF-8") as f:
         return json.load(f)
