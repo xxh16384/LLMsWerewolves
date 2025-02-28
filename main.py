@@ -139,7 +139,7 @@ def main():
     apis = read_json(apis_path)
     players = []
     for i in range(len(roles)):
-        players.append(Player("deepseek-r1",roles[i],i+1))
+        players.append(Player("qwen-max",roles[i],i+1))
     Context(0,"这是一局有7个玩家的狼人杀，分别有2个狼人，3个村民，一个预言家和一个女巫",get_all_players())
     while True:
         ins = input("\n请输入指令:")
@@ -160,6 +160,7 @@ def main():
                 content = input("请输入群发信息：")
                 for i in player_ids:
                     players[i-1].pub_chat(0,content)
+                Context(0,content,get_all_players())
             elif ins == "out":
                 player_ids = [int(i) for i in input("请输入出局玩家编号：").split(",")]
                 for i in player_ids:
@@ -170,6 +171,7 @@ def main():
                 content = "请投票，投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以简短发言，解释投票理由。"
                 for i in player_ids:
                     players[i-1].pub_chat(0,content)
+                Context(0,content,get_all_players())
                 result = {i:0 for i in player_ids}
                 for i in player_ids:
                     voted = extract_numbers_from_brackets(players[i-1].messages[-1]['content'])
@@ -193,7 +195,7 @@ if __name__ == "__main__":
     logger.setLevel(level = logging.INFO)
     handler = logging.FileHandler("log.md",encoding="UTF-8")
     handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('**%(asctime)s-%(levelname)s** \n```\n%(message)s```\n\n')
+    formatter = logging.Formatter('**%(asctime)s-%(levelname)s** \n%(message)s\n\n')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
