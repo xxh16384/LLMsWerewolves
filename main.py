@@ -1,6 +1,7 @@
 from openai import OpenAI
 import json
 import logging
+import os
 
 def read_json(file_path):
     with open(file_path,"r",encoding="UTF-8") as f:
@@ -31,11 +32,31 @@ def extract_numbers_from_brackets(text):
 
     return numbers
 
-def get_all_players():
-    return [i for i in range(1,len(roles)+1)]
+def get_all_players(t = "object"):
+    if t == "object":
+        return players
+    elif t == "id":
+        return [i.id for i in players]
 
-def get_all_werewolfs():
-    return [i for i in range(1,len(roles)+1) if roles[i-1] == "werewolf"]
+def get_alive_werewolfs(t = "object"):
+    if t == "object":
+        return [i for i in players if i.role == "werewolf"]
+    elif t == "id":
+        return [i.id for i in players if i.role == "werewolf"]
+
+def get_alive_players(t = "object"):
+    if t == "object":
+        return [i for i in players if i.alive]
+    elif t == "id":
+        return [i.id for i in players if i.alive]
+
+def get_players_by_ids(ids:list):
+    ids = [int(i) for i in ids]
+    players_pending = [i for i in players if i.id in ids]
+    if len(players_pending) > 1:
+        return players_pending
+    else:
+        return players_pending[0]
 
 class Context:
     contexts = []
@@ -56,34 +77,32 @@ class Context:
     def __str__(self):
         if self.source_id == 0:
             return f"上帝:{self.content}\n"
-        elif self.source_id == -1:
-            return f"系统提示:{self.content}\n"
         return f"{self.source_id}号玩家:{self.content}\n"
 
 class Player:
-    def __init__(self,model,role,id):
+    def __init__(self,model:str,role:str,id:int):
         self.client = OpenAI(api_key = apis[model]["api_key"], base_url = apis[model]["base_url"])
         self.role = role
         self.id = id
         self.model = model
         self.alive = True
         self.messages = []
-        pre_instruction = f"你是{id}号玩家，" + pre_instructions[role]
-        if role == "werewolf":
-            wolf_index = [i + 1 for i,val in enumerate(roles) if val=="werewolf"]
-            pre_instruction += f"\n编号为{wolf_index}的玩家都是狼人，是你的队友"
+    
+    def init_system_prompt(self):
+        pre_instruction = f"你是{self.id}号玩家，" + pre_instructions[self.role]
+        if self.role == "werewolf":
+            wolfs = get_alive_werewolfs("id")
+            pre_instruction += f"\n以下玩家是狼人{wolfs}，是你和你的队友"
         self.messages.append({"role":"system","content":pre_instruction})
 
     def get_response(self,prompt,if_pub):
         pub_messages = Context.get_context(self.id)
-        print(f"\n玩家{self.id}： ", end="", flush=True)
         prompt0 = prompt
         if if_pub:
             prompt = f"\n此前的公共信息如下：{str(pub_messages)}...注意：你现在在公共发言阶段，你的所有输出会被所有玩家听到，请直接口语化的输出你想表达的信息，不要暴露你的意图。（连括号中的内容也会被看到）" + prompt
         else:
             prompt = f"\n此前的公共信息如下：{str(pub_messages)}...注意：你现在在私聊阶段，你的输出只会被上帝听到。（如果你是狼人，你的聊天还会被同阵营的玩家听到）" + prompt
         self.messages.append({"role":"user","content":prompt})
-        prompt = ""
         response = self.client.chat.completions.create(
             model = apis[self.model]["model_name"],
             messages = self.messages,
@@ -93,29 +112,42 @@ class Player:
 
         # 处理回复
         collected_messages = ""
-        if self.model == "deepseek-r1":
-            print(f"正在思考： ", end="", flush=True)
-            reasoning = True
-        else:
-            reasoning = False
+        reasoning_model = -1 # 判断是否是推理模型，-1待判断，0不是，1是
+        print(f"玩家{self.id}（{self.role}）： ", end="", flush=True)
         for chunk in response:
-            if self.model == "deepseek-r1" and chunk.choices[0].delta.reasoning_content:
-                chunk_message = chunk.choices[0].delta.reasoning_content
-                print(chunk_message, end="", flush=True)
-            if chunk.choices[0].delta.content:
-                if reasoning:
-                    reasoning = False
+            if reasoning_model == -1:
+                try:
+                    reasoning_message = chunk.choices[0].delta.reasoning_content
+                    reasoning_model = 1
+                    reasoning = True
+                    print("思考中...\n", end="", flush=True)
+                    print(reasoning_message, end="", flush=True)
+                except:
+                    reasoning_model = 0
+            elif reasoning_model == 1:
+                reasoning_message = chunk.choices[0].delta.reasoning_content
+                chunk_message = chunk.choices[0].delta.content
+                if reasoning_message and reasoning:
+                    print(reasoning_message, end="", flush=True)
+                elif not reasoning_message and reasoning and chunk_message:
                     print("\n思考结束...\n")
+                    reasoning = False
+                    collected_messages += chunk_message
+                    print(chunk_message, end="", flush=True)
+                elif not reasoning:
+                    collected_messages += chunk_message
+                    print(chunk_message, end="", flush=True)
+            else:
                 chunk_message = chunk.choices[0].delta.content
                 collected_messages += chunk_message
                 print(chunk_message, end="", flush=True)
 
         # 加入公共上下文
         if if_pub:
-            Context(self.id,collected_messages,get_all_players())
+            Context(self.id,collected_messages,get_all_players("id"))
         else:
             if self.role == "werewolf":
-                Context(self.id,collected_messages,get_all_werewolfs())
+                Context(self.id,collected_messages,get_alive_werewolfs("id"))
             else:
                 Context(self.id,collected_messages)
         self.messages.append({"role":"assistant","content":collected_messages})
@@ -132,55 +164,74 @@ class Player:
         else:
             self.get_response(f"{source_id}号玩家：{content}",True)
 
+    def __str__(self):
+        return f"玩家{self.id}（{self.role}）"
+
 def main():
     global pre_instructions
     global apis
+    global players
+
+    # 读取文件
     pre_instructions = read_json(instructions_path)
     apis = read_json(apis_path)
+    players_info = read_json(players_info_path)
+
+    # 初始化玩家信息
     players = []
-    for i in range(len(roles)):
-        players.append(Player(use_model,roles[i],i+1))
-    Context(0,"这是一局有7个玩家的狼人杀，分别有2个狼人，3个村民，一个预言家和一个女巫",get_all_players())
+    for i in players_info.keys():
+        if i == "0":
+            continue
+        model = players_info[i]["model"]
+        roles = players_info[i]["role"]
+        players.append(Player(model,roles,int(i)))
+    for i in players:
+        i.init_system_prompt()
+    Context(0,players_info["0"],get_all_players("id"))
+
+    # 游戏主循环
     while True:
         ins = input("\n请输入指令:")
         try:
             if ins == "b":
-                Context(0,input("请输入信息："),get_all_players())
+                Context(0,input("请输入信息："),get_all_players("id"))
             elif ins == "exit":
                 break
             elif ins == "pr":
                 player_id = int(input("请输入玩家编号："))
-                players[player_id-1].private_chat(0,input("请输入信息："))
+                get_players_by_ids([player_id]).private_chat(0,input("请输入信息："))
             elif ins == "pu":
                 player_id = int(input("请输入玩家编号："))
-                players[player_id-1].pub_chat(0,input("请输入信息："))
+                get_players_by_ids([player_id]).pub_chat(0,input("请输入信息："))
             elif ins == "pu_batch":
                 input_str = input("请输入群发玩家编号：")
-                player_ids = [int(i) for i in input_str.split(",")] if not input_str == "" else [i for i in range(1,len(roles)+1) if players[i-1].alive]
+                players_pending = get_players_by_ids(list(input_str.split(","))) if not input_str == "" else get_alive_players()
                 content = input("请输入群发信息：")
-                for i in player_ids:
-                    players[i-1].pub_chat(0,content)
                 Context(0,content,get_all_players())
+                for i in players_pending:
+                    i.pub_chat(0,content)
             elif ins == "out":
-                player_ids = [int(i) for i in input("请输入出局玩家编号：").split(",")]
-                for i in player_ids:
-                    players[i-1].alive = False
+                input_str = input("请输入群发玩家编号：")
+                players_pending = get_players_by_ids(list(input_str.split(",")))
+                for i in players_pending:
+                    i.alive = False
             elif ins == "vote":
                 input_str = input("请输入投票玩家编号：")
-                player_ids = [int(i) for i in input_str.split(",")] if not input_str == "" else [i for i in range(1,len(roles)+1) if players[i-1].alive]
+                players_pending = get_players_by_ids(list(input_str.split(","))) if not input_str == "" else get_alive_players()
                 content = "请投票，投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以简短发言，解释投票理由。"
-                for i in player_ids:
-                    players[i-1].pub_chat(0,content)
                 Context(0,content,get_all_players())
-                result = {i:0 for i in player_ids}
-                for i in player_ids:
-                    voted = extract_numbers_from_brackets(players[i-1].messages[-1]['content'])
-                    if voted and int(voted[0]) in player_ids:
-                        result[int(voted[0])] += 1
+                for i in players_pending:
+                    i.pub_chat(0,content)
+                result = {i.id:0 for i in players_pending}
+                for i in players_pending:
+                    voted = extract_numbers_from_brackets(i.messages[-1]['content'])
+                    if voted and int(voted[-1]) in get_alive_players("id"):
+                        result[int(voted[-1])] += 1
                 logger.info(f"投票结果：{result}")
             elif ins == "wolf_discuss":
+                pass
                 input_str = input("请输入讨论玩家编号：")
-                player_ids = [int(i) for i in input_str.split(",")] if not input_str == "" else [i for i in range(1,len(roles)+1) if players[i-1].role == "werewolf"]
+                players_pending = get_players_by_ids(list(input_str.split(","))) if not input_str == "" else get_alive_werewolfs()
             elif ins == "print_context":
                 for i in Context.contexts:
                     print(i,i.visible_ids)
@@ -190,22 +241,24 @@ def main():
             print(e)
 
 if __name__ == "__main__":
+    instructions_path = "instructions.json"
+    apis_path = "apis.json"
+    players_info_path = "player_info.json"
+    game_name = input("请输入游戏名称：")
+    
+    if not os.path.exists("./log"):
+        os.mkdir("./log")
+    if not os.path.exists(f"./log/{game_name}.md"):
+        with open(f"./log/{game_name}.md","w",encoding="UTF-8") as f:
+            f.write("# " + game_name + "\n\n")
 
     logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
     logger.setLevel(level = logging.INFO)
-    handler = logging.FileHandler("log.md",encoding="UTF-8")
+    handler = logging.FileHandler(f"./log/{game_name}.md",encoding="UTF-8")
     handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('**%(asctime)s-%(levelname)s** \n%(message)s\n\n')
+    formatter = logging.Formatter('**%(asctime)s-%(levelname)s** \n%(message)s\n')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-
-    instructions_path = "instructions.json"
-    apis_path = "apis.json"
-    use_model = "qwen-max"
-    roles = ["werewolf"]*2 + ["villager"]*3 + ["witch", "seer"]
-    # -1为系统提示词，0为上帝，1、2狼人，3、4、5村民，6女巫，7预言家
-    game_name = input("请输入游戏名称：")
-    logger.info(game_name)
 
     main()
