@@ -32,38 +32,41 @@ def extract_numbers_from_brackets(text):
 
     return numbers
 
-def get_all_players(t = "object"):
-    if t == "object":
-        return players
-    elif t == "id":
-        return [i.id for i in players]
+def get_werewolfs(t = "object",alive = True):
+    if alive:
+        if t == "object":
+            return [i for i in Player.players if i.role == "werewolf" and i.alive]
+        elif t == "id":
+            return [i.id for i in Player.players if i.role == "werewolf" and i.alive]
+    else:
+        if t == "object":
+            return [i for i in Player.players if i.role == "werewolf"]
+        elif t == "id":
+            return [i.id for i in Player.players if i.role == "werewolf"]
 
-def get_alive_werewolfs(t = "object"):
-    if t == "object":
-        return [i for i in players if i.role == "werewolf"]
-    elif t == "id":
-        return [i.id for i in players if i.role == "werewolf"]
-
-def get_alive_players(t = "object"):
-    if t == "object":
-        return [i for i in players if i.alive]
-    elif t == "id":
-        return [i.id for i in players if i.alive]
+def get_players(t = "object",alive = True):
+    if alive:
+        if t == "object":
+            return [i for i in Player.players if i.alive]
+        elif t == "id":
+            return [i.id for i in Player.players if i.alive]
+    else:
+        if t == "object":
+            return Player.players
+        elif t == "id":
+            return [i.id for i in Player.players]
 
 def get_players_by_ids(ids:list):
     ids = [int(i) for i in ids]
-    players_pending = [i for i in players if i.id in ids]
-    if len(players_pending) > 1:
-        return players_pending
-    else:
-        return players_pending[0]
+    players_pending = [i for i in Player.players if i.id in ids]
+    return players_pending
 
 class Context:
     contexts = []
     def __init__(self,source_id,content,visible_ids = []):
         self.source_id = source_id
         self.content = content
-        self.visible_ids = set(visible_ids + [source_id] if visible_ids else [source_id])
+        self.visible_ids = set(visible_ids + [source_id,0] if visible_ids else [source_id,0])
         Context.contexts.append(self)
         logger.info(str(self))
 
@@ -76,10 +79,13 @@ class Context:
 
     def __str__(self):
         if self.source_id == 0:
-            return f"上帝:{self.content}\n"
-        return f"{self.source_id}号玩家:{self.content}\n"
+            return f"上帝:{self.content}（{self.visible_ids}可见）\n"
+        return f"{self.source_id}号玩家:{self.content}（{self.visible_ids}可见）\n"
 
 class Player:
+
+    players = []
+
     def __init__(self,model:str,role:str,id:int):
         self.client = OpenAI(api_key = apis[model]["api_key"], base_url = apis[model]["base_url"])
         self.role = role
@@ -87,11 +93,12 @@ class Player:
         self.model = model
         self.alive = True
         self.messages = []
-    
+        Player.players.append(self)
+
     def init_system_prompt(self):
         pre_instruction = f"你是{self.id}号玩家，" + pre_instructions[self.role]
         if self.role == "werewolf":
-            wolfs = get_alive_werewolfs("id")
+            wolfs = get_werewolfs("id",alive=False)
             pre_instruction += f"\n以下玩家是狼人{wolfs}，是你和你的队友"
         self.messages.append({"role":"system","content":pre_instruction})
 
@@ -99,9 +106,9 @@ class Player:
         pub_messages = Context.get_context(self.id)
         prompt0 = prompt
         if if_pub:
-            prompt = f"\n此前的公共信息如下：{str(pub_messages)}...注意：你现在在公共发言阶段，你的所有输出会被所有玩家听到，请直接口语化的输出你想表达的信息，不要暴露你的意图。（连括号中的内容也会被看到）" + prompt
+            prompt = f"\n此前你能得知的玩家发言以及公共信息如下：{str(pub_messages)}...注意：你现在在公共发言阶段，你的所有输出会被所有玩家听到，请直接口语化的输出你想表达的信息，不要暴露你的意图。（连括号中的内容也会被看到）" + prompt
         else:
-            prompt = f"\n此前的公共信息如下：{str(pub_messages)}...注意：你现在在私聊阶段，你的输出只会被上帝听到。（如果你是狼人，你的聊天还会被同阵营的玩家听到）" + prompt
+            prompt = f"\n此前你能得知的玩家发言以及公共信息如下：{str(pub_messages)}...注意：你现在在私聊阶段，你的输出只会被上帝听到。（如果你是狼人，你的聊天还会被同阵营的玩家听到）" + prompt
         self.messages.append({"role":"user","content":prompt})
         response = self.client.chat.completions.create(
             model = apis[self.model]["model_name"],
@@ -144,18 +151,20 @@ class Player:
 
         # 加入公共上下文
         if if_pub:
-            Context(self.id,collected_messages,get_all_players("id"))
+            Context(self.id,collected_messages,get_players("id",alive=False))
         else:
             if self.role == "werewolf":
-                Context(self.id,collected_messages,get_alive_werewolfs("id"))
+                Context(self.id,collected_messages,get_werewolfs("id"))
             else:
                 Context(self.id,collected_messages)
         self.messages.append({"role":"assistant","content":collected_messages})
 
     def private_chat(self,source_id,content):
         if source_id == 0:
+            Context(0,f"上帝：{content}",[self.id])
             self.get_response(f"上帝：{content}",False)
         else:
+            Context(source_id,f"{source_id}号玩家：{content}",[self.id])
             self.get_response(f"{source_id}号玩家：{content}",False)
 
     def pub_chat(self,source_id,content):
@@ -167,91 +176,138 @@ class Player:
     def __str__(self):
         return f"玩家{self.id}（{self.role}）"
 
+def init_game(players_info):
+    for i in players_info.keys():
+        if i == "0":
+            continue
+        model = players_info[i]["model"]
+        roles = players_info[i]["role"]
+        Player(model,roles,int(i))
+    for i in Player.players:
+        i.init_system_prompt()
+    Context(0,players_info["0"],get_players(t="id",alive=False))
+
+def find_max_key(vote_dict):
+    max_value = max(vote_dict.values())
+    max_keys = [k for k, v in vote_dict.items() if v == max_value]
+    return max_keys[0] if len(max_keys) == 1 else 0
+
+def vote():
+    players_pending = get_players()
+    content = "请投票，投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以简短发言，解释投票理由。"
+    Context(0,content,get_players(alive=False))
+    for i in players_pending:
+        i.pub_chat(0,content)
+    result = {i.id:0 for i in players_pending}
+    for i in players_pending:
+        voted = extract_numbers_from_brackets(i.messages[-1]['content'])
+        if voted and int(voted[-1]) in get_players("id"):
+                        result[int(voted[-1])] += 1
+    return result
+
+def public_discussion():
+    players_pending = get_players()
+    content = "请公开讨论，在此阶段你可以简短发言，解释讨论理由。"
+    Context(0,content,get_players(t="id",alive=False))
+    for i in players_pending:
+        i.pub_chat(0,content)
+
+def werewolf_killing():
+    players_pending = get_werewolfs()
+    content = "今晚你想杀谁？"
+    for i in players_pending:
+        i.private_chat(0,content)
+    content = "请进行杀人投票，杀人投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以自由发言解释杀人理由。"
+    for i in players_pending:
+        i.private_chat(0,content)
+    result = {i.id:0 for i in get_players()}
+    for i in players_pending:
+        voted = extract_numbers_from_brackets(i.messages[-1]['content'])
+        if voted and int(voted[-1]) in get_players("id"):
+            result[int(voted[-1])] += 1
+    return result
+
 def main():
     global pre_instructions
     global apis
-    global players
 
     # 读取文件
     pre_instructions = read_json(instructions_path)
     apis = read_json(apis_path)
     players_info = read_json(players_info_path)
 
-    # 初始化玩家信息
-    players = []
-    for i in players_info.keys():
-        if i == "0":
-            continue
-        model = players_info[i]["model"]
-        roles = players_info[i]["role"]
-        players.append(Player(model,roles,int(i)))
-    for i in players:
-        i.init_system_prompt()
-    Context(0,players_info["0"],get_all_players("id"))
+    init_game(players_info)
 
     # 游戏主循环
     while True:
         ins = input("\n请输入指令:")
         try:
             if ins == "b":
-                Context(0,input("请输入信息："),get_all_players("id"))
+                Context(0,input("请输入信息："),get_players(t="id",alive=False))
             elif ins == "exit":
                 break
             elif ins == "pr":
                 player_id = int(input("请输入玩家编号："))
-                get_players_by_ids([player_id]).private_chat(0,input("请输入信息："))
+                get_players_by_ids([player_id])[0].private_chat(0,input("请输入信息："))
             elif ins == "pu":
                 player_id = int(input("请输入玩家编号："))
-                get_players_by_ids([player_id]).pub_chat(0,input("请输入信息："))
+                get_players_by_ids([player_id])[0].pub_chat(0,input("请输入信息："))
             elif ins == "pu_batch":
                 input_str = input("请输入群发玩家编号：")
-                players_pending = get_players_by_ids(list(input_str.split(","))) if not input_str == "" else get_alive_players()
+                players_pending = get_players_by_ids(list(input_str.split(","))) if not input_str == "" else get_players()
                 content = input("请输入群发信息：")
-                Context(0,content,get_all_players())
+                Context(0,content,get_players(alive=False))
                 for i in players_pending:
                     i.pub_chat(0,content)
+            elif ins == "pub_discuss":
+                public_discussion()
             elif ins == "out":
-                input_str = input("请输入群发玩家编号：")
+                input_str = input("请输入出局玩家编号：")
                 players_pending = get_players_by_ids(list(input_str.split(",")))
                 for i in players_pending:
                     i.alive = False
             elif ins == "vote":
-                input_str = input("请输入投票玩家编号：")
-                players_pending = get_players_by_ids(list(input_str.split(","))) if not input_str == "" else get_alive_players()
-                content = "请投票，投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以简短发言，解释投票理由。"
-                Context(0,content,get_all_players())
-                for i in players_pending:
-                    i.pub_chat(0,content)
-                result = {i.id:0 for i in players_pending}
-                for i in players_pending:
-                    voted = extract_numbers_from_brackets(i.messages[-1]['content'])
-                    if voted and int(voted[-1]) in get_alive_players("id"):
-                        result[int(voted[-1])] += 1
+                result = vote()
                 logger.info(f"投票结果：{result}")
-            elif ins == "wolf_discuss":
-                pass
-                input_str = input("请输入讨论玩家编号：")
-                players_pending = get_players_by_ids(list(input_str.split(","))) if not input_str == "" else get_alive_werewolfs()
+                out = find_max_key(result)
+                if out == 0:
+                    Context(0,"投票失败无人出局",get_players(t="id",alive=False))
+                else:
+                    players_pending = get_players_by_ids([out])
+                    for i in players_pending:
+                        i.alive = False
+                        Context(0,f"{i.id}号玩家出局",get_players(t="id",alive=False))
+            elif ins == "wolf_kill":
+                result = werewolf_killing()
+                logger.info(f"杀人结果：{result}")
+                out = find_max_key(result)
+                if out == 0:
+                    Context(0,f"杀人失败无人出局",get_werewolfs(t="id",alive=False))
+                else:
+                    Context(0,f"确认{out}号玩家被杀",get_werewolfs(t="id",alive=False))
             elif ins == "print_context":
                 for i in Context.contexts:
-                    print(i,i.visible_ids)
+                    print(i)
             else:
                 print("无效指令，请重新输入")
         except Exception as e:
             print(e)
 
 if __name__ == "__main__":
+    # 输入路径配置
     instructions_path = "instructions.json"
     apis_path = "apis.json"
     players_info_path = "player_info.json"
     game_name = input("请输入游戏名称：")
-    
+
+    # 创建日志文件
     if not os.path.exists("./log"):
         os.mkdir("./log")
     if not os.path.exists(f"./log/{game_name}.md"):
         with open(f"./log/{game_name}.md","w",encoding="UTF-8") as f:
             f.write("# " + game_name + "\n\n")
 
+    # 设置日志记录器
     logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
     logger.setLevel(level = logging.INFO)
