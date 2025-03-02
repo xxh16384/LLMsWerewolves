@@ -32,29 +32,29 @@ def extract_numbers_from_brackets(text):
 
     return numbers
 
-def get_werewolfs(t = "object",alive = True):
-    if alive:
-        if t == "object":
-            return [i for i in Player.players if i.role == "werewolf" and i.alive]
-        elif t == "id":
-            return [i.id for i in Player.players if i.role == "werewolf" and i.alive]
+def get_players(t = "object",alive = True , role = "all"):
+    if role == "all":
+        if alive:
+            if t == "object":
+                return [i for i in Player.players if i.alive]
+            elif t == "id":
+                return [i.id for i in Player.players if i.alive]
+        else:
+            if t == "object":
+                return Player.players
+            elif t == "id":
+                return [i.id for i in Player.players]
     else:
-        if t == "object":
-            return [i for i in Player.players if i.role == "werewolf"]
-        elif t == "id":
-            return [i.id for i in Player.players if i.role == "werewolf"]
-
-def get_players(t = "object",alive = True):
-    if alive:
-        if t == "object":
-            return [i for i in Player.players if i.alive]
-        elif t == "id":
-            return [i.id for i in Player.players if i.alive]
-    else:
-        if t == "object":
-            return Player.players
-        elif t == "id":
-            return [i.id for i in Player.players]
+        if alive:
+            if t == "object":
+                return [i for i in Player.players if i.role == role and i.alive]
+            elif t == "id":
+                return [i.id for i in Player.players if i.role == role and i.alive]
+        else:
+            if t == "object":
+                return [i for i in Player.players if i.role == role]
+            elif t == "id":
+                return [i.id for i in Player.players if i.role == role]
 
 def get_players_by_ids(ids:list):
     ids = [int(i) for i in ids]
@@ -93,12 +93,15 @@ class Player:
         self.model = model
         self.alive = True
         self.messages = []
+        if self.role == "witch":
+            self.poison = False
+            self.antidote = False
         Player.players.append(self)
 
     def init_system_prompt(self):
         pre_instruction = f"你是{self.id}号玩家，" + pre_instructions[self.role]
         if self.role == "werewolf":
-            wolfs = get_werewolfs("id",alive=False)
+            wolfs = get_players("id",alive=False,role="werewolf")
             pre_instruction += f"\n以下玩家是狼人{wolfs}，是你和你的队友"
         self.messages.append({"role":"system","content":pre_instruction})
 
@@ -149,12 +152,14 @@ class Player:
                 collected_messages += chunk_message
                 print(chunk_message, end="", flush=True)
 
+        print("")
+
         # 加入公共上下文
         if if_pub:
             Context(self.id,collected_messages,get_players("id",alive=False))
         else:
             if self.role == "werewolf":
-                Context(self.id,collected_messages,get_werewolfs("id"))
+                Context(self.id,collected_messages,get_players("id",role="werewolf"))
             else:
                 Context(self.id,collected_messages)
         self.messages.append({"role":"assistant","content":collected_messages})
@@ -195,7 +200,7 @@ def find_max_key(vote_dict):
 def vote():
     players_pending = get_players()
     content = "请投票，投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以简短发言，解释投票理由。"
-    Context(0,content,get_players(alive=False))
+    Context(0,content,get_players(t="id",alive=False))
     for i in players_pending:
         i.pub_chat(0,content)
     result = {i.id:0 for i in players_pending}
@@ -213,7 +218,9 @@ def public_discussion():
         i.pub_chat(0,content)
 
 def werewolf_killing():
-    players_pending = get_werewolfs()
+    players_pending = get_players(role="werewolf")
+    if not players_pending:
+        return
     content = "今晚你想杀谁？"
     for i in players_pending:
         i.private_chat(0,content)
@@ -226,6 +233,120 @@ def werewolf_killing():
         if voted and int(voted[-1]) in get_players("id"):
             result[int(voted[-1])] += 1
     return result
+
+def seer_seeing():
+    seer=get_players(role="seer",alive=False)[0]
+    if not seer.alive:
+        return
+    seer.private_chat(0,"你今晚要查谁？要查询的玩家编号请用[]包围，例如'我要查询[7]号玩家'。可以简短的给出理由。")
+    target = extract_numbers_from_brackets(seer.messages[-1]['content'])
+    seer.private_chat(0,f"你今晚要查的玩家是{get_players_by_ids(target)[0]}，他的身份是{get_players_by_ids(target)[0].role}")
+
+def witch_operation(death_today):
+    witch = get_players(role="witch",alive=False)[0]
+    if not witch.alive:
+        return
+    if death_today:
+        if not witch.poison and not witch.antidote:
+            witch.private_chat(0,f"今晚{death_today}号玩家被杀了，你可以选择救他或者不救，选择结果用[]包围，救请写[1]，不救请写[0]，你可以简短的给出理由。另外，你今晚还有毒药，如果不救，你可以选择毒杀别人，如果不救，是否毒杀将在下一条消息中选择，本次回复无需选择，只需要回答救或者不救这一问题。")
+            voted = extract_numbers_from_brackets(witch.messages[-1]['content'])
+            if voted and int(voted[-1]) == 1:
+                witch.antidote = True
+                Context(0,f"今晚{death_today}号玩家被杀了，你选择了救他",get_players(t="id",alive=False,role="witch"))
+                get_players_by_ids([death_today])[0].alive = True
+            else:
+                Context(0,f"今晚{death_today}号玩家被杀了，你选择了不救他",get_players(t="id",alive=False,role="witch"))
+                witch.private_chat(0,f"你可以选择毒杀别人，选择结果用[]包围，毒杀结果请写在[]中，例如你要杀1号玩家，请写[1]，不毒杀请写[0]。")
+                voted = extract_numbers_from_brackets(witch.messages[-1]['content'])
+                if int(voted[-1]):
+                    witch.poison = True
+                    Context(0,f"今晚{death_today}号玩家被杀了，你选择了毒杀{int(voted[-1])}号玩家",get_players(t="id",alive=False,role="witch"))
+                    get_players_by_ids([int(voted[-1])])[0].alive = False
+                else:
+                    Context(0,f"今晚{death_today}号玩家被杀了，你选择了不毒杀",get_players(t="id",alive=False,role="witch"))
+        elif not witch.antidote and witch.poison:
+            witch.private_chat(0,f"今晚{death_today}号玩家被杀了，你可以选择救他或者不救，选择结果用[]包围，救请写[1]，不救请写[0]，你可以简短的给出理由。另外，你今晚没有毒药了。")
+            voted = extract_numbers_from_brackets(witch.messages[-1]['content'])
+            if voted and int(voted[-1]) == 1:
+                witch.antidote = True
+                Context(0,f"今晚{death_today}号玩家被杀了，你选择了救他",get_players(t="id",alive=False,role="witch"))
+                get_players_by_ids([death_today])[0].alive = True
+        elif witch.antidote and not witch.poison:
+            witch.private_chat(0,"你可以选择毒杀别人，选择结果用[]包围，毒杀结果请写在[]中，例如你要杀1号玩家，请写[1]，不毒杀请写[0]。")
+            voted = extract_numbers_from_brackets(witch.messages[-1]['content'])
+            if int(voted[-1]):
+                witch.poison = True
+                Context(0,f"你选择了毒杀{int(voted[-1])}号玩家",get_players(t="id",alive=False,role="witch"))
+                get_players_by_ids([int(voted[-1])])[0].alive = False
+            else:
+                Context(0,f"你选择了不毒杀",get_players(t="id",alive=False,role="witch"))
+        else:
+            pass
+    else:
+        if not witch.poison:
+            witch.private_chat(0,"你可以选择毒杀别人，选择结果用[]包围，毒杀结果请写在[]中，例如你要杀1号玩家，请写[1]，不毒杀请写[0]。")
+            voted = extract_numbers_from_brackets(witch.messages[-1]['content'])
+            if int(voted[-1]):
+                witch.poison = True
+                Context(0,f"你选择了毒杀{int(voted[-1])}号玩家",get_players(t="id",alive=False,role="witch"))
+                get_players_by_ids([int(voted[-1])])[0].alive = False
+            else:
+                Context(0,f"你选择了不毒杀",get_players(t="id",alive=False,role="witch"))
+        else:
+            pass
+
+
+def auto():
+    global pre_instructions
+    global apis
+
+    # 读取文件
+    pre_instructions = read_json(instructions_path)
+    apis = read_json(apis_path)
+    players_info = read_json(players_info_path)
+
+    init_game(players_info)
+
+    days = 0
+
+    # 游戏主循环
+    while len(get_players(alive=True)) > 0:
+        players_id_before_night = set(get_players(t="id",alive=True))
+        Context(0,f"现在是第{days+1}天，天黑请闭眼。",get_players(t="id",alive=False))
+        killed_tonight =find_max_key(werewolf_killing())
+        get_players_by_ids([killed_tonight])[0].alive = False
+        seer_seeing()
+        witch_operation(killed_tonight)
+        death_tonight = players_id_before_night - set(get_players(t="id",alive=True))
+        if len(death_tonight) > 0:
+            Context(0,f"天亮了，今晚{list(death_tonight)[0]}号玩家被杀了，出局。",get_players(t="id",alive=False))
+        else:
+            Context(0,f"天亮了，今晚是个平安夜，没有人死亡。",get_players(t="id",alive=False))
+        public_discussion()
+        vote_result = vote()
+        out = find_max_key(vote_result)
+        if out > 0:
+            Context(0,f"投票结果是{out}号玩家出局，身份是{get_players_by_ids(int(out))[0].role}",get_players(t="id",alive=False))
+            get_players_by_ids([out])[0].alive = False
+            get_players_by_ids([out])[0].pub_chat(0,f"你被投票出局了，请发表遗言。")
+        else:
+            Context(0,f"没有人被投票出局。",get_players(t="id",alive=False))
+        days += 1
+        if len(get_players(alive=True)) - 2*len(get_players(alive=True,role="werewolf")) < 0: # 好人数量小于狼人数量
+            Context(0,f"游戏结束，狼人获胜",get_players(t="id",alive=False))
+            break
+        elif len(get_players(alive=True,role="werewolf")) == 0:
+            Context(0,f"游戏结束，好人获胜",get_players(t="id",alive=False))
+            break
+        else:
+            pass
+    
+    players_pending = get_players(alive=False)
+    content = "请发表复盘感想"
+    Context(0,content,get_players(t="id",alive=False))
+    for i in players_pending:
+        i.pub_chat(0,content)
+    Context(0,f"游戏结束",get_players(t="id",alive=False))
 
 def main():
     global pre_instructions
@@ -282,9 +403,9 @@ def main():
                 logger.info(f"杀人结果：{result}")
                 out = find_max_key(result)
                 if out == 0:
-                    Context(0,f"杀人失败无人出局",get_werewolfs(t="id",alive=False))
+                    Context(0,f"杀人失败无人出局",get_players(t="id",alive=False,role="werewolf"))
                 else:
-                    Context(0,f"确认{out}号玩家被杀",get_werewolfs(t="id",alive=False))
+                    Context(0,f"确认{out}号玩家被杀",get_players(t="id",alive=False,role="werewolf"))
             elif ins == "print_context":
                 for i in Context.contexts:
                     print(i)
@@ -317,4 +438,4 @@ if __name__ == "__main__":
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-    main()
+    auto()
