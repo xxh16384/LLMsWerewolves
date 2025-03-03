@@ -78,9 +78,11 @@ class Context:
         return pub_messages
 
     def __str__(self):
+        v_id = self.visible_ids
+        v_id.discard(0)
         if self.source_id == 0:
-            return f"上帝:{self.content}（{self.visible_ids}可见）\n"
-        return f"{self.source_id}号玩家:{self.content}（{self.visible_ids}可见）\n"
+            return f"上帝:{self.content}（{v_id}可见）\n"
+        return f"{get_players_by_ids([self.source_id])}:{self.content}（{v_id}可见）\n"
 
 class Player:
 
@@ -232,7 +234,13 @@ def werewolf_killing():
         voted = extract_numbers_from_brackets(i.messages[-1]['content'])
         if voted and int(voted[-1]) in get_players("id"):
             result[int(voted[-1])] += 1
-    return result
+    killed = find_max_key(result)
+    if killed:
+        Context(0,f"今晚{killed}号玩家被杀了",get_players(t="id",role="werewolf",alive=False))
+        return killed
+    else:
+        Context(0,f"击杀失败",get_players(t="id",role="werewolf",alive=False))
+        return 0
 
 def seer_seeing():
     seer=get_players(role="seer",alive=False)[0]
@@ -295,6 +303,16 @@ def witch_operation(death_today):
         else:
             pass
 
+def game_over():
+    if len(get_players(alive=True)) - 2*len(get_players(alive=True,role="werewolf")) < 0: # 好人数量小于狼人数量
+        Context(0,f"游戏结束，狼人获胜",get_players(t="id",alive=False))
+        return 1
+    elif len(get_players(alive=True,role="werewolf")) == 0:
+        Context(0,f"游戏结束，好人获胜",get_players(t="id",alive=False))
+        return 1
+    else:
+        return 0
+
 
 def auto():
     global pre_instructions
@@ -313,33 +331,30 @@ def auto():
     while len(get_players(alive=True)) > 0:
         players_id_before_night = set(get_players(t="id",alive=True))
         Context(0,f"现在是第{days+1}天，天黑请闭眼。",get_players(t="id",alive=False))
-        killed_tonight =find_max_key(werewolf_killing())
-        get_players_by_ids([killed_tonight])[0].alive = False
+        killed_tonight =werewolf_killing()
+        if killed_tonight:
+            get_players_by_ids([killed_tonight])[0].alive = False
         seer_seeing()
         witch_operation(killed_tonight)
         death_tonight = players_id_before_night - set(get_players(t="id",alive=True))
         if len(death_tonight) > 0:
-            Context(0,f"天亮了，今晚{list(death_tonight)[0]}号玩家被杀了，出局。",get_players(t="id",alive=False))
+            Context(0,f"天亮了，今晚{list(death_tonight)}号玩家被杀了，出局。",get_players(t="id",alive=False))
         else:
             Context(0,f"天亮了，今晚是个平安夜，没有人死亡。",get_players(t="id",alive=False))
+        if game_over():
+            break
         public_discussion()
         vote_result = vote()
         out = find_max_key(vote_result)
         if out > 0:
-            Context(0,f"投票结果是{out}号玩家出局，身份是{get_players_by_ids(int(out))[0].role}",get_players(t="id",alive=False))
+            Context(0,f"投票结果是{out}号玩家出局，身份是{get_players_by_ids([int(out)])[0].role}",get_players(t="id",alive=False))
             get_players_by_ids([out])[0].alive = False
             get_players_by_ids([out])[0].pub_chat(0,f"你被投票出局了，请发表遗言。")
         else:
             Context(0,f"没有人被投票出局。",get_players(t="id",alive=False))
         days += 1
-        if len(get_players(alive=True)) - 2*len(get_players(alive=True,role="werewolf")) < 0: # 好人数量小于狼人数量
-            Context(0,f"游戏结束，狼人获胜",get_players(t="id",alive=False))
+        if game_over():
             break
-        elif len(get_players(alive=True,role="werewolf")) == 0:
-            Context(0,f"游戏结束，好人获胜",get_players(t="id",alive=False))
-            break
-        else:
-            pass
     
     players_pending = get_players(alive=False)
     content = "请发表复盘感想"
