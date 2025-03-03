@@ -3,6 +3,30 @@ import json
 import logging
 import os
 
+
+def set_logger(game_name):
+    if not os.path.exists("./log"):
+        os.mkdir("./log")
+    if not os.path.exists(f"./log/{game_name}.md"):
+        with open(f"./log/{game_name}.md","w",encoding="UTF-8") as f:
+            f.write("# " + game_name + "\n\n")
+
+    # 设置日志记录器
+    logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logger = logging.getLogger(__name__)
+    logger.setLevel(level = logging.INFO)
+    handler = logging.FileHandler(f"./log/{game_name}.md",encoding="UTF-8")
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('**%(asctime)s-%(levelname)s** \n%(message)s\n')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    return logger
+
+logger = set_logger("test")
+instructions_path = "instructions.json"
+apis_path = "apis.json"
+players_info_path = "player_info.json"
+
 def read_json(file_path):
     with open(file_path,"r",encoding="UTF-8") as f:
         return json.load(f)
@@ -82,13 +106,14 @@ class Context:
         v_id.discard(0)
         if self.source_id == 0:
             return f"上帝:{self.content}（{v_id}可见）\n"
-        return f"{get_players_by_ids([self.source_id])}:{self.content}（{v_id}可见）\n"
+        return f"{get_players_by_ids([self.source_id])[0]}:{self.content}（{v_id}可见）\n"
 
 class Player:
 
     players = []
+    apis = {}
 
-    def __init__(self,model:str,role:str,id:int):
+    def __init__(self,model:str,role:str,id:int,apis:dict):
         self.client = OpenAI(api_key = apis[model]["api_key"], base_url = apis[model]["base_url"])
         self.role = role
         self.id = id
@@ -99,8 +124,9 @@ class Player:
             self.poison = False
             self.antidote = False
         Player.players.append(self)
+        Player.apis = apis
 
-    def init_system_prompt(self):
+    def init_system_prompt(self,pre_instructions:dict):
         pre_instruction = f"你是{self.id}号玩家，" + pre_instructions[self.role]
         if self.role == "werewolf":
             wolfs = get_players("id",alive=False,role="werewolf")
@@ -116,7 +142,7 @@ class Player:
             prompt = f"\n此前你能得知的玩家发言以及公共信息如下：{str(pub_messages)}...注意：你现在在私聊阶段，你的输出只会被上帝听到。（如果你是狼人，你的聊天还会被同阵营的玩家听到）" + prompt
         self.messages.append({"role":"user","content":prompt})
         response = self.client.chat.completions.create(
-            model = apis[self.model]["model_name"],
+            model = Player.apis[self.model]["model_name"],
             messages = self.messages,
             stream = True
         )
@@ -183,15 +209,15 @@ class Player:
     def __str__(self):
         return f"玩家{self.id}（{self.role}）"
 
-def init_game(players_info):
+def init_game(players_info, apis, pre_instructions):
     for i in players_info.keys():
         if i == "0":
             continue
         model = players_info[i]["model"]
         roles = players_info[i]["role"]
-        Player(model,roles,int(i))
+        Player(model,roles,int(i),apis)
     for i in Player.players:
-        i.init_system_prompt()
+        i.init_system_prompt(pre_instructions)
     Context(0,players_info["0"],get_players(t="id",alive=False))
 
 def find_max_key(vote_dict):
@@ -315,15 +341,13 @@ def game_over():
 
 
 def auto():
-    global pre_instructions
-    global apis
 
     # 读取文件
     pre_instructions = read_json(instructions_path)
     apis = read_json(apis_path)
     players_info = read_json(players_info_path)
 
-    init_game(players_info)
+    init_game(players_info, apis, pre_instructions)
 
     days = 0
 
@@ -437,20 +461,6 @@ if __name__ == "__main__":
     game_name = input("请输入游戏名称：")
 
     # 创建日志文件
-    if not os.path.exists("./log"):
-        os.mkdir("./log")
-    if not os.path.exists(f"./log/{game_name}.md"):
-        with open(f"./log/{game_name}.md","w",encoding="UTF-8") as f:
-            f.write("# " + game_name + "\n\n")
-
-    # 设置日志记录器
-    logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    logger = logging.getLogger(__name__)
-    logger.setLevel(level = logging.INFO)
-    handler = logging.FileHandler(f"./log/{game_name}.md",encoding="UTF-8")
-    handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('**%(asctime)s-%(levelname)s** \n%(message)s\n')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    logger = set_logger(game_name)
 
     auto()
