@@ -74,6 +74,7 @@ with st.sidebar:
                 r"E:\试试大模型\LLMsWerewolves\instructions.json"
             )
             st.session_state.initialized = True
+            st.session_state.log_container = st.empty()
             st.success(f"游戏 {game_name} 创建成功！")
 
 if st.session_state.game and st.session_state.initialized:
