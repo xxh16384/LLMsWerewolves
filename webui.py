@@ -4,6 +4,8 @@ from main import logger, instructions_path, apis_path, players_info_path
 import logging
 import os
 
+# 目前完全完全不可用！！
+
 def init_session():
     if "game_initialized" not in st.session_state:
         st.session_state.game_initialized = False
