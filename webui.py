@@ -71,7 +71,8 @@ with st.sidebar:
                 game_name,
                 r"E:\试试大模型\LLMsWerewolves\player_info.json",
                 r"E:\试试大模型\LLMsWerewolves\apis.json",
-                r"E:\试试大模型\LLMsWerewolves\instructions.json"
+                r"E:\试试大模型\LLMsWerewolves\instructions.json",
+                webui_mode=True
             )
             st.session_state.initialized = True
             st.session_state.log_container = st.empty()
@@ -102,24 +103,18 @@ if st.session_state.game and st.session_state.initialized:
         
         # 更新日志容器内容
         log_container.markdown(f"""
-<div id="log-container" style="height: 500px; overflow-y: auto;">
+<div id="log-container" style="overflow-y: auto;">
     {formatted_logs}
 </div>
         """, unsafe_allow_html=True)
 
-        # 添加自动滚动到底部的JavaScript代码
-        st.components.v1.html("""
-<script>
-    // 获取日志容器并滚动到底部
-    const logContainer = document.getElementById('log-container');
-    if (logContainer) {
-        logContainer.scrollTop = logContainer.scrollHeight;
-    }
-</script>
-        """, height=0)
-
         # 更新缓存
         st.session_state.log_cache = current_logs.copy()
+
+        st.components.v1.html("""<script>
+window.location.hash = "存活玩家状态";
+</script>
+""", height=0)
     
     days, phase = game.get_game_stage()
     st.info(f"当前阶段：第{days}天 {'☀️ 白天' if phase else '🌙 夜晚'}")
@@ -160,7 +155,7 @@ if st.session_state.game and st.session_state.initialized:
             with st.session_state.game_lock:
                 update_logs()
             
-            time.sleep(0.5)
+            time.sleep(2)
             st.rerun()  # 保持强制刷新
             
             try:
