@@ -90,7 +90,12 @@ class Context:
         self.source_id = source_id
         self.content = content
         self.visible_ids = set(visible_ids + [source_id,0] if visible_ids else [source_id,0])
-        self.game.logger.info(str(self))
+
+        if self.game:
+            self.game.logger.info(self.__str__())
+            # 强制触发日志更新（关键改进点）
+            if hasattr(self.game, 'streamlit_log_trigger'):
+                self.game.streamlit_log_trigger.set()
 
     def get_context(id,game):
         """
@@ -355,7 +360,10 @@ class Game:
             os.mkdir("./log")
         log_file_path = f"./log/{game_name}.md"
         fh = logging.FileHandler(log_file_path, encoding="UTF-8")
-        fh.setLevel(logging.DEBUG)
+        fh.setFormatter(logging.Formatter(
+            '**%(asctime)s - %(levelname)s**\n%(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        ))
 
         # 设置日志格式
         formatter = logging.Formatter('**%(asctime)s - %(levelname)s**\n%(message)s')
@@ -732,6 +740,7 @@ class Game:
 
 if __name__ == "__main__":
     # 输入路径配置
+    # 控制台运行程序
     instructions_path = "instructions.json"
     apis_path = "apis.json"
     players_info_path = "player_info.json"
