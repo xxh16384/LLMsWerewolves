@@ -14,13 +14,26 @@ ROLE_COLORS = {
     "seer": "#2980b9"       # 蓝色
 }
 
+player_role_to_chinese = {
+    "werewolf": "狼人",
+    "villager": "村民",
+    "witch": "女巫",
+    "seer": "预言家",
+    "上帝": "上帝",
+    "未知": "未知"
+}
+
 ROLE_ICONS = {
     "werewolf": "🐺",
     "villager": "👨🌾",
     "witch": "🧙♀",
-    "seer": "🔮"
+    "seer": "🔮",
+    "上帝":"👑",
+    "未知":"❓"
 }
 
+
+# 初始化session状态（确保在主线程初始化）
 def init_session_state():
     required_keys = {
         'game': None,
@@ -53,100 +66,98 @@ def format_log_message(context, game):
     background: {ROLE_COLORS.get(role, "#f1f1f1")};
     color: white;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    {streaming_style}
-'>
-    <div style="display: flex; align-items: center; gap: 8px;">
-        <span style="font-size: 1.2em">{ROLE_ICONS.get(role, "")}</span>
-        <strong>玩家 {context.source_id} ({role})</strong>
-    </div>
-    <div style='margin-top: 8px;'>
+'><a name="source_id_{context.source_id}"></a>
+    <strong style='font-size: 0.9em;'>{player_role_to_chinese.get(role, "未知")}{ROLE_ICONS.get(role, "❓")} (玩家{context.source_id})</strong>
+    <div style='margin-top: 5px; font-size: 0.95em;'>
         {context.content.replace('\n', '<br>')}
     </div>
-</div>"""
-
-# 侧边栏配置
-with st.sidebar:
-    st.title("⚙️ 游戏配置")
-    
-    # 文件上传
-    uploaded_files = {
-        'player_info': st.file_uploader("玩家配置 (player_info.json)", type="json"),
-        'apis': st.file_uploader("API配置 (apis.json)", type="json"),
-        'instructions': st.file_uploader("游戏指令 (instructions.json)", type="json")
-    }
-    
-    game_name = st.text_input("游戏名称", "狼人杀游戏1")
-    
-    if st.button("🔄 初始化游戏", use_container_width=True):
-        if all(uploaded_files.values()):
-            try:
-                configs = {}
-                for key, uploader in uploaded_files.items():
-                    configs[key] = json.load(uploader)
-                
-                with st.spinner("正在创建游戏..."):
-                    with st.session_state.game_lock:
-                        st.session_state.game = Game(
-                            game_name,
-                            players_info_path=configs['player_info'],
-                            apis_path=configs['apis'],
-                            instructions_path=configs['instructions'],
-                            is_webui_mode=True
-                        )
-                        st.session_state.game.is_webui_mode = True  # 启用WebUI模式
-                        st.session_state.game.streamlit_log_trigger = Event()
-                        st.session_state.log_cache = []
-                        st.session_state.phase_thread = None
-                        st.session_state.phase_progress = None
-                        st.session_state.log_container = st.empty()
-                        st.success("游戏初始化成功！")
-            except Exception as e:
-                st.error(f"配置错误: {str(e)}")
-        else:
-            st.warning("请先上传所有配置文件")
+</div>"""  # 显式闭合div标签 <source_id data="webui.py" />
 
 # 主界面
 st.title("🎭 狼人杀AI对局系统")
 
-# 玩家状态栏
-if st.session_state.game:
-    st.subheader("👥 玩家状态")
-    players = st.session_state.game.get_players(alive=False)
+# 侧边栏配置
+with st.sidebar:
+    st.title("🎮 游戏配置")
+    game_name = st.text_input("输入游戏名称", "狼人杀游戏1")
+    files = {
+    "instructions":st.file_uploader("上传游戏提示词（instructions.json）", type=["json"]),
+    "player_info":st.file_uploader("上传玩家信息（player_info.json）", type=["json"]),
+    "apis":st.file_uploader("上传API配置（apis.json）", type=["json"])
+    }
     
-    cols = st.columns(len(players))
-    for col, player in zip(cols, players):
-        with col:
-            status = "🟢" if player.alive else "⚪"
-            role_icon = ROLE_ICONS.get(player.role, "")
-            col.markdown(f"""
-                <div style='
-                    padding: 12px;
-                    border-radius: 8px;
-                    background: {ROLE_COLORS.get(player.role, "#f1f1f1")};
-                    color: white;
-                    text-align: center;
-                '>
-                    <div style="font-size: 1.5em">{status}{role_icon}</div>
-                    <div>玩家 {player.id}</div>
-                    <div style="font-size: 0.9em">{'存活' if player.alive else '出局'}</div>
-                </div>
-            """, unsafe_allow_html=True)
+    if st.button("创建新游戏"):
+        with st.spinner("初始化游戏..."), st.session_state.game_lock:
+            st.session_state.game = None
+            st.session_state.log_cache = []
+            st.session_state.phase_thread = None
+            st.session_state.phase_progress = None  # 重置为None
+            st.session_state.initialized = False
+            
+            st.session_state.game = Game(
+                game_name,
+                files["player_info"].getvalue(),
+                files["apis"].getvalue(),
+                files["instructions"].getvalue(),
+                webui_mode=True
+            )
+            st.session_state.initialized = True
+            st.session_state.log_container = st.empty()
+            st.success(f"游戏 {game_name} 创建成功！")
 
-# 游戏日志显示
-if st.session_state.game:
+if st.session_state.game and st.session_state.initialized:
     game = st.session_state.game
+
+    st.subheader("👥 玩家状态")
+    players = game.get_players(alive=False)
+    cols = st.columns(3)
+    for i, player in enumerate(players):
+        with cols[i % 3]:
+            role_color = ROLE_COLORS.get(player.role, "#FFF")
+            st.markdown(f"""<div style='text-align: center; padding: 12px; border-radius: 12px; background-color: {role_color};'>
+    <h4>玩家{player.id}</h4>
+    <p>{ROLE_ICONS.get(player.role,"❓")}</p>
+    <p>{'✅ 存活' if player.alive else '❌ 出局'}</p>
+</div>""", unsafe_allow_html=True)
+
+    days, phase = game.get_game_stage()
+    st.info(f"当前阶段：第{days}天 {'☀️ 白天' if phase else '🌙 夜晚'}")
+    st.subheader("💬 日志")
+    log_container = st.empty()
     
-    # 阶段控制按钮
-    is_disabled = False
-    if st.session_state.phase_thread and st.session_state.phase_thread.is_alive():
-        is_disabled = True
+    def update_logs():
+        current_logs = Context.contexts.get(game, [])
+        new_logs = current_logs[len(st.session_state.log_cache):]
+        
+        formatted_logs = "".join([str(format_log_message(c, game)) for c in st.session_state.log_cache + new_logs])
+        
+        # 更新日志容器内容
+        log_container.markdown(f"""
+<div id="log-container" style="overflow-y: auto;">
+    {formatted_logs}
+</div>
+        """, unsafe_allow_html=True)
+
+        # 更新缓存
+        st.session_state.log_cache = current_logs.copy()
+
+        st.components.v1.html("""<script>
+window.location.hash = "存活玩家状态";
+</script>
+""", height=0)
+
     
-    if st.button("⏭️ 进入下一阶段", 
-                 use_container_width=True,
-                 disabled=is_disabled,
-                 key="next_phase_button"):
-        with st.session_state.game_lock:
-            st.session_state.phase_progress = Queue()
+
+    if st.button("进入下一阶段"):
+        with st.spinner("处理阶段..."), st.session_state.game_lock:
+            if st.session_state.phase_thread and st.session_state.phase_thread.is_alive():
+                if st.session_state.phase_progress:
+                    st.session_state.phase_progress.put("skip")
+                st.session_state.phase_thread.join(timeout=2)
+            
+            # 创建新的队列并传递给线程
+            phase_progress = Queue()
+            st.session_state.phase_progress = phase_progress
             
             def run_phase(progress_queue):
                 try:
@@ -179,15 +190,8 @@ if st.session_state.game:
             current_logs = Context.contexts.get(game, [])
             new_logs = current_logs[len(st.session_state.log_cache):]
             
-            # 动态更新日志
-            with st.session_state.log_container.container():
-                for ctx in new_logs:
-                    st.markdown(format_log_message(ctx, game), unsafe_allow_html=True)
-                
-                # 强制刷新界面
-                st.rerun()
-                
-            st.session_state.log_cache = current_logs.copy()
+            time.sleep(2)
+            st.rerun()  # 保持强制刷新
             
         except Exception as e:
             st.error(f"日志更新失败: {str(e)}")
