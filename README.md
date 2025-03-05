@@ -48,7 +48,7 @@ api配置模板如下，主键是模型简称，用于程序调用
 
 ### 扩展功能
 
-可以在instruction.json中添加职业提示词实现更丰富的玩法，也可以修改general提示词实现警徽玩法。
+可以在instruction.json中添加职业提示词实现更丰富的玩法，也可以修改general提示词以及vote()函数实现警徽玩法。
 
 ### 试试webui能不能用？
 
@@ -65,4 +65,3 @@ streamlit run webui.py
 ## 总之
 
 这个小程序现在很粗糙，以后再完善吧）
-
