@@ -107,9 +107,7 @@ with st.sidebar:
 
 if st.session_state.game and st.session_state.initialized:
     game = st.session_state.game
-    
-    log_container = st.empty()
-    
+
     st.subheader("👥 玩家状态")
     players = game.get_players(alive=False)
     cols = st.columns(3)
@@ -121,6 +119,11 @@ if st.session_state.game and st.session_state.initialized:
     <p>{ROLE_ICONS.get(player.role,"❓")}</p>
     <p>{'✅ 存活' if player.alive else '❌ 出局'}</p>
 </div>""", unsafe_allow_html=True)
+
+    days, phase = game.get_game_stage()
+    st.info(f"当前阶段：第{days}天 {'☀️ 白天' if phase else '🌙 夜晚'}")
+    st.subheader("💬 日志")
+    log_container = st.empty()
     
     def update_logs():
         current_logs = Context.contexts.get(game, [])
@@ -144,40 +147,17 @@ window.location.hash = "存活玩家状态";
 """, height=0)
 
     
-    cols = st.columns(len(players))
-    for col, player in zip(cols, players):
-        with col:
-            status = "🟢" if player.alive else "⚪"
-            role_icon = ROLE_ICONS.get(player.role, "")
-            col.markdown(f"""
-                <div style='
-                    padding: 12px;
-                    border-radius: 8px;
-                    background: {ROLE_COLORS.get(player.role, "#f1f1f1")};
-                    color: white;
-                    text-align: center;
-                '>
-                    <div style="font-size: 1.5em">{status}{role_icon}</div>
-                    <div>玩家 {player.id}</div>
-                    <div style="font-size: 0.9em">{'存活' if player.alive else '出局'}</div>
-                </div>
-            """, unsafe_allow_html=True)
 
-# 游戏日志显示
-if st.session_state.game:
-    game = st.session_state.game
-    
-    # 阶段控制按钮
-    is_disabled = False
-    if st.session_state.phase_thread and st.session_state.phase_thread.is_alive():
-        is_disabled = True
-    
-    if st.button("⏭️ 进入下一阶段", 
-                 use_container_width=True,
-                 disabled=is_disabled,
-                 key="next_phase_button"):
-        with st.session_state.game_lock:
-            st.session_state.phase_progress = Queue()
+    if st.button("进入下一阶段"):
+        with st.spinner("处理阶段..."), st.session_state.game_lock:
+            if st.session_state.phase_thread and st.session_state.phase_thread.is_alive():
+                if st.session_state.phase_progress:
+                    st.session_state.phase_progress.put("skip")
+                st.session_state.phase_thread.join(timeout=2)
+            
+            # 创建新的队列并传递给线程
+            phase_progress = Queue()
+            st.session_state.phase_progress = phase_progress
             
             def run_phase(progress_queue):
                 try:

@@ -195,7 +195,7 @@ class Player:
             pre_instruction += f"\n以下玩家是狼人{wolfs}，是你和你的队友"
         self.messages.append({"role":"system","content":pre_instruction})
 
-    def get_response_print(self,prompt,if_pub):
+    def get_response(self,prompt,if_pub):
         """
         Simulates a conversation with the player, given a prompt and whether the response should be public.
 
@@ -332,11 +332,11 @@ class Player:
         """
         
         if source_id == 0:
-            Context(self.game,0,f"上帝：{content}",[self.id])
-            self.get_response_print(f"上帝：{content}",False)
+            Context(self.game,0,f"{content}",[self.id])
+            self.get_response(f"上帝：{content}",False)
         else:
-            Context(self.game,source_id,f"{source_id}号玩家：{content}",[self.id])
-            self.get_response_print(f"{source_id}号玩家：{content}",False)
+            Context(self.game,source_id,f"{content}",[self.id])
+            self.get_response(f"{source_id}号玩家：{content}",False)
 
     def pub_chat(self,source_id,content):
         """
@@ -353,9 +353,9 @@ class Player:
         """
 
         if source_id == 0:
-            self.get_response_print(f"上帝：{content}",True)
+            self.get_response(f"上帝：{content}",True)
         else:
-            self.get_response_print(f"{source_id}号玩家：{content}",True)
+            self.get_response(f"{source_id}号玩家：{content}",True)
 
     def __str__(self):
         return f"玩家{self.id}（{self.role}）"
