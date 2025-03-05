@@ -50,6 +50,16 @@ api配置模板如下，主键是模型简称，用于程序调用
 
 可以在instruction.json中添加职业提示词实现更丰富的玩法，也可以修改general提示词实现警徽玩法。
 
+### 试试webui能不能用？
+
+控制台运行
+
+```bash
+streamlit run webui.py
+```
+
+或者使用`启动webui.bat`启动webui
+
 ---
 
 ## 总之
