@@ -97,9 +97,7 @@ with st.sidebar:
 
 if st.session_state.game and st.session_state.initialized:
     game = st.session_state.game
-    
-    log_container = st.empty()
-    
+
     st.subheader("👥 玩家状态")
     players = game.get_players(alive=False)
     cols = st.columns(3)
@@ -111,6 +109,11 @@ if st.session_state.game and st.session_state.initialized:
     <p>{ROLE_ICONS.get(player.role,"❓")}</p>
     <p>{'✅ 存活' if player.alive else '❌ 出局'}</p>
 </div>""", unsafe_allow_html=True)
+
+    days, phase = game.get_game_stage()
+    st.info(f"当前阶段：第{days}天 {'☀️ 白天' if phase else '🌙 夜晚'}")
+    st.subheader("💬 日志")
+    log_container = st.empty()
     
     def update_logs():
         current_logs = Context.contexts.get(game, [])
@@ -133,9 +136,7 @@ window.location.hash = "存活玩家状态";
 </script>
 """, height=0)
     
-    days, phase = game.get_game_stage()
-    st.info(f"当前阶段：第{days}天 {'☀️ 白天' if phase else '🌙 夜晚'}")
-    
+
     if st.button("进入下一阶段"):
         with st.spinner("处理阶段..."), st.session_state.game_lock:
             if st.session_state.phase_thread and st.session_state.phase_thread.is_alive():
