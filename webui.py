@@ -1,17 +1,16 @@
 import streamlit as st
 from main import Game, Context, find_max_key
 import time
-import json
 from threading import Thread, Lock, Event
 from queue import Queue
 
 # 角色颜色配置
 ROLE_COLORS = {
-    "上帝": "#2c3e50",    # 深灰蓝
-    "werewolf": "#e74c3c",  # 红色
-    "villager": "#27ae60",  # 绿色
-    "witch": "#8e44ad",     # 紫色
-    "seer": "#2980b9"       # 蓝色
+    "上帝": "#FFFFFF",    # 白色
+    "werewolf": "#FF6B6B",  # 红色
+    "villager": "#4ECDC4",  # 青色
+    "witch": "#96CEB4",     # 绿色
+    "seer": "#45B7D1"       # 蓝色
 }
 
 player_role_to_chinese = {
@@ -35,19 +34,13 @@ ROLE_ICONS = {
 
 # 初始化session状态（确保在主线程初始化）
 def init_session_state():
-    required_keys = {
-        'game': None,
-        'log_cache': [],
-        'game_lock': Lock(),
-        'phase_thread': None,
-        'phase_progress': None,
-        'uploaded_files': {},
-        'initialized': False,
-        'log_container': None
-    }
-    for key, value in required_keys.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
+    if 'initialized' not in st.session_state:
+        st.session_state.game = None
+        st.session_state.log_cache = []
+        st.session_state.game_lock = Lock()
+        st.session_state.phase_thread = None
+        st.session_state.phase_progress = None  # 初始化为None
+        st.session_state.initialized = True
 
 init_session_state()
 
@@ -55,16 +48,13 @@ def format_log_message(context, game):
     role = "上帝" if context.source_id == 0 else next(
         (p.role for p in game.players if p.id == context.source_id), "未知"
     )
-    # 添加安全判断
-    streaming_style = "border-left: 3px solid #f39c12; padding-left: 10px;" if getattr(context, 'is_streaming', False) else ""
     
-    return f"""
-<div style='
-    padding: 12px;
+    # 使用标准颜色代码并修复闭合标签
+    return f"""<div style='
+    padding: 10px;
     margin: 8px 0;
     border-radius: 8px;
-    background: {ROLE_COLORS.get(role, "#f1f1f1")};
-    color: white;
+    background-color: {ROLE_COLORS.get(role, "#F0F0F0")};
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 '><a name="source_id_{context.source_id}"></a>
     <strong style='font-size: 0.9em;'>{player_role_to_chinese.get(role, "未知")}{ROLE_ICONS.get(role, "❓")} (玩家{context.source_id})</strong>
@@ -76,7 +66,7 @@ def format_log_message(context, game):
 # 主界面
 st.title("🎭 狼人杀AI对局系统")
 
-# 侧边栏配置
+# 侧边栏控制
 with st.sidebar:
     st.title("🎮 游戏配置")
     game_name = st.text_input("输入游戏名称", "狼人杀游戏1")
@@ -145,7 +135,6 @@ if st.session_state.game and st.session_state.initialized:
 window.location.hash = "存活玩家状态";
 </script>
 """, height=0)
-
     
 
     if st.button("进入下一阶段"):
@@ -175,82 +164,34 @@ window.location.hash = "存活玩家状态";
                 finally:
                     progress_queue.put("done")
             
-            st.session_state.phase_thread = Thread(
-                target=run_phase,
-                args=(st.session_state.phase_progress,)
-            )
+            st.session_state.phase_thread = Thread(target=run_phase, args=(phase_progress,))
             st.session_state.phase_thread.start()
     
-    # 实时日志更新
-    def update_logs():
-        if not st.session_state.game:
-            return
-        
-        try:
-            current_logs = Context.contexts.get(game, [])
-            new_logs = current_logs[len(st.session_state.log_cache):]
+    def monitor_phase(progress_queue):
+        start_time = time.time()
+        while time.time() - start_time < 30:
+            with st.session_state.game_lock:
+                update_logs()
             
             time.sleep(2)
             st.rerun()  # 保持强制刷新
             
-        except Exception as e:
-            st.error(f"日志更新失败: {str(e)}")
+            try:
+                if progress_queue.get_nowait() == "done":
+                    break
+            except:
+                continue
     
-    # 流式更新监控
-    if game.streamlit_log_trigger.is_set():
-        update_logs()
-        game.streamlit_log_trigger.clear()
-    
-    # 阶段处理监控
     if st.session_state.phase_thread and st.session_state.phase_thread.is_alive():
-        with st.spinner("正在处理游戏阶段..."):
-            while True:
-                try:
-                    if st.session_state.phase_progress.get_nowait() == "done":
-                        break
-                except:
-                    pass
-                update_logs()
-                time.sleep(0.3)
-            
-            st.session_state.phase_thread.join()
-            update_logs()
-            
-            if game.game_over():
-                st.balloons()
-                st.success("🎉 游戏结束！")
-                st.session_state.phase_thread = None
-                st.session_state.phase_progress = None
-                st.stop()
-
+        with st.spinner("阶段处理中..."):
+            if st.session_state.phase_progress:
+                monitor_phase(st.session_state.phase_progress)
+        
+        if game.game_over():
+            st.balloons()
+            st.success("游戏结束！")
+            st.stop()
+    else:
+        update_logs()
 else:
-    st.info("👋 请先在侧边栏上传配置文件并初始化游戏")
-
-# 全局样式
-st.markdown("""
-<style>
-    [data-testid="stSidebar"] {
-        background: #f8f9fa !important;
-        border-right: 1px solid #eee !important;
-    }
-    .stButton button {
-        transition: all 0.3s ease;
-        background: #4a90e2 !important;
-        color: white !important;
-    }
-    .stButton button:disabled {
-        background: #cccccc !important;
-        cursor: not-allowed;
-    }
-    .st-emotion-cache-1y4p8pa {
-        padding-top: 2rem;
-    }
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    .streaming-message {
-        animation: fadeIn 0.5s ease-in;
-    }
-</style>
-""", unsafe_allow_html=True)
+    st.info("请先创建游戏")

@@ -72,7 +72,6 @@ def find_max_key(vote_dict):
 class Context:
     contexts = {}
     def __init__(self,game,source_id,content,visible_ids = [],is_streaming = False, last_block = False):
-
         """
         保存游戏中的一个信息
 
@@ -95,7 +94,6 @@ class Context:
                 Context.contexts[game].pop(-1)
                 streaming = False if last_block else True
         Context.contexts[game].append(self)
-
         self.game = game
         self.is_streaming = is_streaming
         self.last_block = last_block
@@ -263,6 +261,7 @@ class Player:
                     chunk_message = chunk.choices[0].delta.content
                     collected_messages += chunk_message
                     print(chunk_message, end="", flush=True)
+
             print("")
             # 加入公共上下文
             if if_pub:
@@ -383,7 +382,6 @@ class Game:
             kill_tonight (list): the players to be killed tonight
         """
         self.game_name = game_name
-        self.is_webui_mode = is_webui_mode
         self.set_logger(game_name)
 
         if webui_mode:
