@@ -17,8 +17,20 @@ player_role_to_chinese = {
     "werewolf": "狼人",
     "villager": "村民",
     "witch": "女巫",
-    "seer": "预言家"
+    "seer": "预言家",
+    "上帝": "上帝",
+    "未知": "未知"
 }
+
+ROLE_ICONS = {
+    "werewolf": "🐺",
+    "villager": "👨🌾",
+    "witch": "🧙♀",
+    "seer": "🔮",
+    "上帝":"👑",
+    "未知":"❓"
+}
+
 
 # 初始化session状态（确保在主线程初始化）
 def init_session_state():
@@ -44,20 +56,25 @@ def format_log_message(context, game):
     border-radius: 8px;
     background-color: {ROLE_COLORS.get(role, "#F0F0F0")};
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-'>
-    <strong style='font-size: 0.9em;'>{role} (玩家{context.source_id})</strong>
+'><a name="source_id_{context.source_id}"></a>
+    <strong style='font-size: 0.9em;'>{player_role_to_chinese.get(role, "未知")}{ROLE_ICONS.get(role, "❓")} (玩家{context.source_id})</strong>
     <div style='margin-top: 5px; font-size: 0.95em;'>
         {context.content.replace('\n', '<br>')}
     </div>
 </div>"""  # 显式闭合div标签 <source_id data="webui.py" />
 
 # 主界面
-st.title("狼人杀大模型版")
+st.title("🎭 狼人杀AI对局系统")
 
 # 侧边栏控制
 with st.sidebar:
-    st.title("游戏控制台")
+    st.title("🎮 游戏配置")
     game_name = st.text_input("输入游戏名称", "狼人杀游戏1")
+    files = {
+    "instructions":st.file_uploader("上传游戏提示词（instructions.json）", type=["json"]),
+    "player_info":st.file_uploader("上传玩家信息（player_info.json）", type=["json"]),
+    "apis":st.file_uploader("上传API配置（apis.json）", type=["json"])
+    }
     
     if st.button("创建新游戏"):
         with st.spinner("初始化游戏..."), st.session_state.game_lock:
@@ -69,9 +86,9 @@ with st.sidebar:
             
             st.session_state.game = Game(
                 game_name,
-                r"E:\试试大模型\LLMsWerewolves\player_info.json",
-                r"E:\试试大模型\LLMsWerewolves\apis.json",
-                r"E:\试试大模型\LLMsWerewolves\instructions.json",
+                files["player_info"].getvalue(),
+                files["apis"].getvalue(),
+                files["instructions"].getvalue(),
                 webui_mode=True
             )
             st.session_state.initialized = True
@@ -83,7 +100,7 @@ if st.session_state.game and st.session_state.initialized:
     
     log_container = st.empty()
     
-    st.subheader("存活玩家状态")
+    st.subheader("👥 玩家状态")
     players = game.get_players(alive=False)
     cols = st.columns(3)
     for i, player in enumerate(players):
@@ -91,7 +108,7 @@ if st.session_state.game and st.session_state.initialized:
             role_color = ROLE_COLORS.get(player.role, "#FFF")
             st.markdown(f"""<div style='text-align: center; padding: 12px; border-radius: 12px; background-color: {role_color};'>
     <h4>玩家{player.id}</h4>
-    <p>{player_role_to_chinese[player.role]}</p>
+    <p>{ROLE_ICONS.get(player.role,"❓")}</p>
     <p>{'✅ 存活' if player.alive else '❌ 出局'}</p>
 </div>""", unsafe_allow_html=True)
     

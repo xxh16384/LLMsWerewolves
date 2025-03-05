@@ -384,9 +384,14 @@ class Game:
         self.game_name = game_name
         self.set_logger(game_name)
 
-        self.instructions = read_json(instructions_path)
-        self.apis = read_json(apis_path)
-        self.players_info = read_json(players_info_path)
+        if webui_mode:
+            self.instructions = json.loads(instructions_path.decode())
+            self.apis = json.loads(apis_path.decode())
+            self.players_info = json.loads(players_info_path.decode())
+        else:
+            self.instructions = read_json(instructions_path)
+            self.apis = read_json(apis_path)
+            self.players_info = read_json(players_info_path)
         self.players = []
         self.id = Game.ids
         Game.ids += 1
