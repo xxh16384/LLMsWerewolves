@@ -326,21 +326,25 @@ class Player:
         
         if source_id == 0:
             Context(self.game,0,f"{content}",[self.id])
+            if not self.game.webui_mode:
+                print(f"上帝：{content}")
             self.get_response(f"上帝：{content}",False)
         else:
             Context(self.game,source_id,f"{content}",[self.id])
+            if not self.game.webui_mode:
+                print(f"{source_id}号玩家：{content}")
             self.get_response(f"{source_id}号玩家：{content}",False)
 
-    def pub_chat(self,source_id,content):
+    def pub_chat(self,source_id,content,add_to_context = True):
         """
         Handles public chat messages within the game context.
 
-        This method allows a player or the system (represented by source_id = 0) to send 
-        a public chat message to all players. The message is processed and displayed 
+        This method allows a player or the system (represented by source_id = 0) to send
+        a public chat message to all players. The message is processed and displayed
         publicly, allowing all players to see the interaction.
 
         Args:
-            source_id (int): The ID of the player or system sending the message. 
+            source_id (int): The ID of the player or system sending the message.
                             If 0, the message is from the system ("上帝").
             content (str): The content of the message to be sent publicly.
         """
@@ -349,6 +353,8 @@ class Player:
             self.get_response(f"上帝：{content}",True)
         else:
             self.get_response(f"{source_id}号玩家：{content}",True)
+        if add_to_context:
+            Context(self.game,source_id,content,self.game.get_player(t="id",alive=False))
 
     def __str__(self):
         return f"玩家{self.id}（{self.role}）"
@@ -647,7 +653,7 @@ class Game:
         content = "请公开讨论，在此阶段你可以简短发言，解释讨论理由。"
         Context(self,0,content,self.get_players(t="id",alive=False))
         for i in players_pending:
-            i.pub_chat(0,content)
+            i.pub_chat(0,content,add_to_context=False)
 
     def vote(self) -> dict:
         """
@@ -663,7 +669,7 @@ class Game:
         content = "请投票，投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以简短发言，解释投票理由。"
         Context(self,0,content,self.get_players(t="id",alive=False))
         for i in players_pending:
-            i.pub_chat(0,content)
+            i.pub_chat(0,content,add_to_context=False)
         result = {i.id:0 for i in players_pending}
         for i in players_pending:
             voted = extract_numbers_from_brackets(i.messages[-1]['content'])
@@ -795,7 +801,7 @@ class Game:
 
     def __str__(self):
         return f"{self.game_name}：第{self.get_game_stage()[0]}天{"白天" if self.get_game_stage()[1] else "晚上"}"
-    
+
     def __eq__(self, value):
         return self.id == value.id
 
@@ -803,9 +809,9 @@ class Game:
 if __name__ == "__main__":
     # 输入路径配置
     # 控制台运行程序
-    instructions_path = "instructions.json"
-    apis_path = "apis.json"
-    players_info_path = "player_info.json"
+    instructions_path = "./config/instructions.json"
+    apis_path = "./config/apis.json"
+    players_info_path = "./config/player_info.json"
     game_name = input("请输入游戏名称：")
 
     game = Game(game_name,players_info_path,apis_path,instructions_path)
