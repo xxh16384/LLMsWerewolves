@@ -274,7 +274,7 @@ class Player:
         else:
             collected_messages = ""
             visible_ids = self.game.get_players("id",alive=False) if if_pub else [self.id,0] + self.game.get_players("id",role="werewolf")
-            c = lambda content:Context(self.game, self.id,content,visible_ids=visible_ids,is_streaming=True,last_block=False)
+            c = lambda content,last_block=False:Context(self.game, self.id,content,visible_ids=visible_ids,is_streaming=True,last_block=last_block)
             for chunk in response:
                 chunk_content = chunk.choices[0].delta.content or ""
                 collected_messages += chunk_content
@@ -285,7 +285,7 @@ class Player:
                             reasoning_message = chunk.choices[0].delta.reasoning_content
                             reasoning_model = 1
                             reasoning = True
-                            c("思考中...\n")
+                            c("<think>\n")
                             c(reasoning_message)
                         except:
                             reasoning_model = 0
@@ -295,7 +295,7 @@ class Player:
                         if reasoning_message and reasoning:
                             c(reasoning_message)
                         elif not reasoning_message and reasoning and chunk_message:
-                            c("\n思考结束...\n")
+                            c("\n</think>\n")
                             reasoning = False
                             collected_messages += chunk_message
                             c(chunk_message)
@@ -312,11 +312,7 @@ class Player:
                     self.game.streamlit_log_trigger.set()
 
             # 保存完整消息
-            final_ctx = Context(self.game, self.id, collected_messages,
-                            visible_ids=visible_ids,
-                            is_streaming=True,
-                            last_block=True
-                            )
+            c("",True)
 
 
         self.messages.append({"role":"assistant","content":collected_messages})
