@@ -85,14 +85,13 @@ class Context:
         if game not in Context.contexts.keys():
             Context.contexts[game] = []
         
-        streaming = False
+        streaming = False if last_block else True
         if is_streaming:
             pre_block = Context.contexts[game][-1]
-            if pre_block.game == game and pre_block.source_id == source_id and pre_block.is_streaming and not pre_block.last_block:
+            if pre_block.source_id == source_id and pre_block.is_streaming and not pre_block.last_block:
                 # 说明和前一条是一个人说的，则更新最后一条
                 content = pre_block.content + content
                 Context.contexts[game].pop(-1)
-                streaming = False if last_block else True
         Context.contexts[game].append(self)
         self.game = game
         self.is_streaming = is_streaming
@@ -264,16 +263,12 @@ class Player:
 
             print("")
             # 加入公共上下文
-            if if_pub:
-                Context(self.game,self.id,collected_messages,self.game.get_players("id",alive=False))
-            else:
-                if self.role == "werewolf":
-                    Context(self.game,self.id,collected_messages,self.game.get_players("id",role="werewolf"))
-                else:
-                    Context(self.game,self.id,collected_messages)
+            visible_ids = self.game.get_players("id",alive=False) if if_pub else [self.id,0] + self.game.get_players("id",role=self.role)
+            Context(self.game,self.id,collected_messages,visible_ids)
+
         else:
             collected_messages = ""
-            visible_ids = self.game.get_players("id",alive=False) if if_pub else [self.id,0] + self.game.get_players("id",role="werewolf")
+            visible_ids = self.game.get_players("id",alive=False) if if_pub else [self.id,0] + self.game.get_players("id",role=self.role)
             c = lambda content,last_block=False:Context(self.game, self.id,content,visible_ids=visible_ids,is_streaming=True,last_block=last_block)
             for chunk in response:
                 chunk_content = chunk.choices[0].delta.content or ""
@@ -593,7 +588,7 @@ class Game:
             return
         if self.kill_tonight:
             if not witch.poison and not witch.antidote:
-                witch.private_chat(0,f"今晚{self.kill_tonight}号玩家被杀了，你可以选择救或者不救，选择结果用[]包围，救请写[x]，x是玩家编号，不救请写[0]，你可以简短的给出理由。另外，你今晚还有毒药，如果不救，你可以选择毒杀别人，如果不救，是否毒杀将在下一条消息中选择，本次回复无需选择，只需要回答救或者不救这一问题。")
+                witch.private_chat(0,f"今晚{self.kill_tonight}号玩家被杀了，你可以选择救或者不救，选择结果用[]包围，例如要救{self.kill_tonight[0]}号玩家，请写[{self.kill_tonight[0]}]，不救请写[0]，你可以简短的给出理由。另外，你今晚还有毒药，如果不救，你可以选择毒杀别人，如果不救，是否毒杀将在下一条消息中选择，本次回复无需选择，只需要回答救或者不救这一问题。")
                 voted = extract_numbers_from_brackets(witch.messages[-1]['content'])
                 if voted and int(voted[-1]):
                     witch.antidote = True
