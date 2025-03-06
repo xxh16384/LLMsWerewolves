@@ -361,7 +361,7 @@ class Player:
 
 class Game:
     ids = 0
-    def __init__(self,game_name,players_info_path,apis_path,instructions_path,webui_mode = False):
+    def __init__(self,game_name,players_info_path,apis_path,instructions_path,webui_mode = False,from_dict = False):
         """
         Initialize a new game instance.
 
@@ -384,10 +384,14 @@ class Game:
         self.game_name = game_name
         self.set_logger(game_name)
 
-        if webui_mode:
+        if webui_mode and not from_dict:
             self.instructions = json.loads(instructions_path.decode())
             self.apis = json.loads(apis_path.decode())
             self.players_info = json.loads(players_info_path.decode())
+        elif from_dict:
+            self.instructions = instructions_path
+            self.apis = apis_path
+            self.players_info = players_info_path
         else:
             self.instructions = read_json(instructions_path)
             self.apis = read_json(apis_path)
@@ -459,7 +463,7 @@ class Game:
         """
 
         for i in self.players_info.keys():
-            if i == "0":
+            if i == "0" or i == 0:
                 continue
             model = self.players_info[i]["model"]
             roles = self.players_info[i]["role"]

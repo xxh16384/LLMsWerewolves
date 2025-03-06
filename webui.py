@@ -1,8 +1,9 @@
 import streamlit as st
-from main import Game, Context, find_max_key
+from main import Game, Context, find_max_key,read_json
 import time
 from threading import Thread, Lock, Event
 from queue import Queue
+import json
 
 # 角色颜色配置
 ROLE_COLORS = {
@@ -36,7 +37,6 @@ def init_session_state():
         st.session_state.current_page = 'config'
     if 'game' not in st.session_state:
         st.session_state.game = None
-    # 新增以下初始化语句
     if 'initialized' not in st.session_state:
         st.session_state.initialized = False
     if 'log_cache' not in st.session_state:
@@ -47,44 +47,457 @@ def init_session_state():
         st.session_state.phase_thread = None
     if 'phase_progress' not in st.session_state:
         st.session_state.phase_progress = None
+    if 'models' not in st.session_state:
+        st.session_state.models = []
+    if 'players' not in st.session_state:
+        st.session_state.players = []
+    if 'instructions' not in st.session_state:
+        try:
+            st.session_state.instructions = read_json("./config/default_instructions.json")
+        except:
+            st.session_state.instructions = {
+                "general": "",
+                "werewolf": "",
+                "villager": "",
+                "witch": "",
+                "seer": ""
+            }
+    if 'current_step' not in st.session_state:
+        st.session_state.current_step = 0
 
 # 配置页面
 def config_page():
-    st.title("⚙️ 游戏配置")
-    
-    with st.form("game_config"):
-        # 游戏基础配置
-        game_name = st.text_input("游戏名称", "狼人杀游戏1")
-        instructions = st.file_uploader("游戏提示词（instructions.json）", type=["json"])
-        player_info = st.file_uploader("玩家信息（player_info.json）", type=["json"])
-        apis = st.file_uploader("API配置（apis.json）", type=["json"])
+    st.set_page_config(page_title="游戏配置🤔", page_icon="🎮", layout="wide", initial_sidebar_state="expanded", menu_items={"About":"https://github.com/xxh16384/LLMsWerewolves"})
+    with st.sidebar:
+        st.title("🎮 快速配置")
+        st.divider()
+        st.markdown("""
+        **游戏规则提示**  
+        ▸ 最少需要4名玩家  
+        ▸ 需要至少1个狼人角色  
+        ▸ 每个玩家必须分配模型  
+        """)
+        st.divider()
+        game_name = st.text_input("输入游戏名称", "狼人杀游戏1")
 
-        # 提交按钮
-        if st.form_submit_button("🚀 开始游戏"):
-            if all([instructions, player_info, apis]):
+        # 配置文件上传区域
+        with st.expander("⚡ 快速加载配置", expanded=True):
+            files = {
+                "instructions": st.file_uploader("提示词配置(instructions.json)", type=["json"]),
+                "player_info": st.file_uploader("玩家配置(player_info.json)", type=["json"]),
+                "apis": st.file_uploader("API配置(apis.json)", type=["json"])
+            }
+
+            load_cols = st.columns([2,1])
+            with load_cols[0]:
+                if st.button("📥 加载配置到表单", help="将上传的配置合并到当前表单", use_container_width=True):
+                    try:
+                        # 模型配置加载
+                        if files["apis"]:
+                            apis_config = json.load(files["apis"])
+                            existing_names = [m["name"] for m in st.session_state.models]
+
+                            # 智能合并模型配置
+                            for name, config in apis_config.items():
+                                if name not in existing_names:
+                                    st.session_state.models.append({
+                                        "name": name,
+                                        "api_key": config["api_key"],
+                                        "base_url": config.get("base_url", "https://api.openai.com/v1"),
+                                        "model_name": config["model_name"]
+                                    })
+
+                        # 修改玩家配置加载部分
+                        if files["player_info"]:
+                            players_config = json.load(files["player_info"])
+                            new_players = []
+                            
+                            # 提取数字键并排序
+                            player_keys = [k for k in players_config.keys() if k.isdigit()]
+                            player_keys = sorted(player_keys, key=lambda x: int(x))
+                            
+                            # 遍历排序后的玩家键
+                            for key in player_keys:
+                                player_data = players_config[key]
+                                if isinstance(player_data, dict):  # 确保是玩家数据
+                                    new_players.append({
+                                        "role": player_data.get("role", "villager"),
+                                        "model": player_data.get("model", "")
+                                    })
+                            
+                            # 验证玩家数量
+                            if len(new_players) < 4:
+                                st.error("玩家数量不能少于4个")
+                            else:
+                                st.session_state.players = new_players
+                                st.session_state.player_num = len(new_players)
+
+                        # 提示词加载
+                        if files["instructions"]:
+                            try:
+                                st.session_state.instructions = json.load(files["instructions"])
+                            except Exception as e:
+                                st.error(f"提示词解析失败: {str(e)}")
+                        
+                        st.success("配置已加载到当前表单！")
+                        success_msg = "成功加载了"
+                        if files["apis"]: success_msg += " API配置"
+                        if files["player_info"]: success_msg += " 玩家配置"
+                        if files["instructions"]: success_msg += " 提示词配置"
+                        if success_msg == "成功加载了":
+                            success_msg = "未加载"
+                        st.session_state.alert_message = success_msg  # 设置弹窗消息
+                        st.session_state.current_step = 3  # 跳转到最后一步
+                        st.rerun()
+
+                        
+                    except json.JSONDecodeError:
+                        st.error("配置文件格式错误，请检查JSON格式")
+                    except Exception as e:
+                        st.error(f"配置加载失败: {str(e)}")
+            
+            with load_cols[1]:
+                if st.button("🔄 重置表单", help="清空所有配置", type="secondary", use_container_width=True):
+                    st.session_state.models = []
+                    st.session_state.players = []
+                    st.session_state.instructions = read_json("./config/default_instructions.json")
+                    st.session_state.current_step = 0
+                    st.rerun()
+
+        # 配置备份区域
+        with st.expander("💾 备份和导入配置", expanded=False):
+            st.download_button(
+                label="导出完整配置",
+                data=json.dumps({
+                    "apis": {m["name"]: m for m in st.session_state.models},
+                    "players": st.session_state.players,
+                    "instructions": st.session_state.instructions
+                }, ensure_ascii=False, indent=2),
+                file_name="werewolf_config.json",
+                mime="application/json",
+                use_container_width=True
+            )
+            # 新增导入配置上传器
+            imported_config = st.file_uploader("上传备份配置", type=["json"], key="import_config")
+            
+            if imported_config and st.button("导入配置", use_container_width=True):
                 try:
+                    config_data = json.load(imported_config)
+                    # 校验配置结构
+                    required_keys = ["apis", "players", "instructions"]
+                    if not all(k in config_data for k in required_keys):
+                        st.error("配置文件格式不完整")
+                    else:
+                        # 合并模型配置（防重复）
+                        existing_model_names = [m["name"] for m in st.session_state.models]
+                        for name, config in config_data["apis"].items():
+                            if name not in existing_model_names:
+                                st.session_state.models.append(config)
+
+                        # 更新玩家配置
+                        if len(config_data["players"]) >= 4:
+                            st.session_state.players = config_data["players"]
+                            st.session_state.player_num = len(config_data["players"])
+                        else:
+                            st.error("玩家数量不足4人")
+                        
+                        # 覆盖提示词
+                        st.session_state.instructions.update(config_data["instructions"])
+                        
+                        st.success("配置导入成功！")
+                        file_name = imported_config.name.split('.')[0][:20]  # 截取文件名前20字符
+                        st.session_state.alert_message = f"成功导入了备份配置：{file_name}"  # 设置弹窗消息
+                        st.session_state.current_step = 3
+                except Exception as e:
+                    st.error(f"配置导入失败: {str(e)}")
+
+        # 开发工具区域
+        with st.expander("⚙️ 开发工具", expanded=False):
+            if st.button("🔄 强制刷新页面", help="清除所有缓存数据", use_container_width=True):
+                st.session_state.clear()
+                st.rerun()
+            if st.toggle("调试模式", help="显示详细日志信息"):
+                st.session_state.debug_mode = True
+            else:
+                st.session_state.debug_mode = False
+
+
+    st.title("⚙️ 游戏配置 - 分步设置")
+
+    # 步骤导航
+    steps = ["1. 模型管理", "2. 玩家配置", "3. 提示词设置", "4. 完成"]
+    current_step_index = st.session_state.get("current_step", 0)
+    current_step = steps[current_step_index]
+
+    # 步骤导航控件
+    nav_cols = st.columns(len(steps))
+    for idx, col in enumerate(nav_cols):
+        with col:
+            # 移除disabled属性和帮助提示
+            if st.button(steps[idx],
+                    key=f"nav_{idx}",
+                    use_container_width=True,
+                    type="primary" if idx == current_step_index else "secondary"):
+                st.session_state.current_step = idx
+                st.rerun()
+
+    # 模型管理步骤
+    if current_step == steps[0]:
+        with st.container(border=True):
+            st.subheader("🔧 模型管理")
+            
+            # 模型添加表单
+            with st.form("model_form", border=True):
+                cols = st.columns([2,1,2])
+                with cols[0]:
+                    model_name = st.text_input("模型名称*", help="例如: GPT-4-0125")
+                with cols[1]:
+                    api_key = st.text_input("API密钥*", type="password")
+                with cols[2]:
+                    base_url = st.text_input("API地址", value="https://api.openai.com/v1")
+                model_config = st.text_input("模型名称（API参数）*", value="gpt-4-turbo")
+                
+                if st.form_submit_button("✅ 确认添加", use_container_width=True):
+                    if model_name and api_key and model_config:
+                        new_model = {
+                            "name": model_name,
+                            "api_key": api_key,
+                            "base_url": base_url,
+                            "model_name": model_config
+                        }
+                        # 检查重复名称
+                        if any(m["name"] == model_name for m in st.session_state.models):
+                            st.error("模型名称已存在！")
+                        else:
+                            st.session_state.models.append(new_model)
+                            st.success(f"已添加模型: {model_name}")
+                    else:
+                        st.error("带*号的为必填项")
+
+            # 模型列表管理
+            st.subheader("已添加模型")
+            if not st.session_state.models:
+                st.info("暂无已配置模型")
+            else:
+                for idx, model in enumerate(st.session_state.models, 1):
+                    with st.expander(f"{idx}. {model['name']}", expanded=False):
+                        cols = st.columns([3,1])
+                        with cols[0]:
+                            st.markdown(f"""
+                            - **API地址**: `{model['base_url']}`
+                            - **模型标识**: `{model['model_name']}`
+                            """)
+                        with cols[1]:
+                            if st.button("删除", key=f"del_model_{idx}"):
+                                st.session_state.models.pop(idx-1)
+                                st.rerun()
+
+    # 玩家配置步骤
+    elif current_step == steps[1]:
+        with st.container(border=True):
+            st.subheader("👥 玩家配置")
+            
+            # 玩家数量控制
+            num_players = st.number_input("玩家数量", 
+                                        min_value=4, 
+                                        max_value=18, 
+                                        value=len(st.session_state.players) if st.session_state.players else 8,
+                                        step=1,
+                                        key="player_num")
+            
+            # 动态调整玩家列表
+            if len(st.session_state.players) != num_players:
+                new_players = []
+                for i in range(num_players):
+                    if i < len(st.session_state.players):
+                        new_players.append(st.session_state.players[i])
+                    else:
+                        new_players.append({"role": "villager", "model": ""})
+                st.session_state.players = new_players
+            
+            # 角色选项配置
+            roles = ["werewolf", "villager", "witch", "seer"]
+            role_names = {
+                "werewolf": "🐺 狼人",
+                "villager": "👨🌾 村民", 
+                "witch": "🧙♀ 女巫",
+                "seer": "🔮 预言家"
+            }
+            
+            # 生成玩家配置项
+            cols = st.columns(4)
+            for i in range(num_players):
+                with cols[i%4]:
+                    with st.container(border=True):
+                        st.markdown(f"### 玩家 {i+1}")
+                        
+                        # 角色选择
+                        current_role = st.session_state.players[i]["role"]
+                        new_role = st.selectbox(
+                            "角色",
+                            options=roles,
+                            index=roles.index(current_role) if current_role in roles else 1,
+                            format_func=lambda x: role_names[x],
+                            key=f"role_{i}"
+                        )
+
+                        # 模型选择
+                        if st.session_state.models:
+                            current_model = st.session_state.players[i]["model"]
+                            model_names = [m["name"] for m in st.session_state.models]
+                            default_idx = model_names.index(current_model) if current_model in model_names else 0
+
+                            new_model = st.selectbox(
+                                "使用模型",
+                                options=model_names,
+                                index=default_idx,
+                                key=f"model_{i}"
+                            )
+                            st.session_state.players[i] = {"role": new_role, "model": new_model}
+                        else:
+                            st.error("请先添加至少一个模型")
+
+    # 提示词设置步骤
+    elif current_step == steps[2]:
+        with st.container(border=True):
+            st.subheader("📝 提示词设置")
+            
+            # 角色名称映射
+            role_names = {
+                "werewolf": "🐺 狼人",
+                "villager": "👨🌾 村民",
+                "witch": "🧙♀ 女巫",
+                "seer": "🔮 预言家"
+            }
+            
+            # 通用提示词设置
+            st.session_state.instructions["general"] = st.text_area(
+                "通用提示词",
+                height=400,
+                value=st.session_state.instructions.get("general", ""),
+                help="使用Markdown格式编写，支持代码块等格式",
+                key="general_inst"
+            )
+            
+            cols = st.columns(2)
+            with cols[0]:
+                if st.button("恢复默认提示词",key="reset_general"):
+                    st.session_state.instructions["general"] = read_json("./config/default_instructions.json")["general"]
+                    st.rerun()
+            with cols[1]:
+                if st.button("清空提示词",key="clear_general"):
+                    st.session_state.instructions["general"] = ""
+                    st.rerun()
+            
+            # 分角色提示词设置
+            role_tabs = st.tabs(["🐺 狼人", "👨🌾 村民", "🧙♀ 女巫", "🔮 预言家"])
+            for idx, tab in enumerate(role_tabs):
+                with tab:
+                    role = ["werewolf", "villager", "witch", "seer"][idx]
+                    st.session_state.instructions[role] = st.text_area(
+                        f"{role_names[role]}提示词",
+                        value=st.session_state.instructions.get(role, ""),
+                        height=400,
+                        key=f"edit_{role}"
+                    )
+                    cols = st.columns(2)
+                    with cols[0]:
+                        if st.button("恢复默认提示词",key=f"reset_{role}"):
+                            st.session_state.instructions[role] = read_json("./config/default_instructions.json")[role]
+                            st.rerun()
+                    with cols[1]:
+                        if st.button("清空提示词",key=f"clear_{role}"):
+                            st.session_state.instructions[role] = ""
+                            st.rerun()
+
+    # 完成配置步骤
+    else:
+        with st.container(border=True):
+            st.subheader("✅ 配置完成")
+            st.text_input("游戏名称", value=game_name, key="game_name")
+            
+            # 配置预览
+            with st.expander("📋 当前配置概览"):
+                config_preview = {
+                    "模型列表": [m["name"] for m in st.session_state.models],
+                    "玩家配置": [
+                        f"玩家{i+1}: {p['role']} => {p['model']}" 
+                        for i, p in enumerate(st.session_state.players)
+                    ],
+                    "提示词摘要": {
+                        "general": st.session_state.instructions["general"][:50] + "..." if st.session_state.instructions["general"] else "空",
+                        "werewolf": st.session_state.instructions["werewolf"][:50] + "..." if st.session_state.instructions["werewolf"] else "空",
+                        "villager": st.session_state.instructions["villager"][:50] + "..." if st.session_state.instructions["villager"] else "空",
+                        "witch": st.session_state.instructions["witch"][:50] + "..." if st.session_state.instructions["witch"] else "空",
+                        "seer": st.session_state.instructions["seer"][:50] + "..." if st.session_state.instructions["seer"] else "空"
+                    }
+                }
+                st.json(config_preview)
+            
+            # 配置验证
+            valid = True
+            validation_errors = []
+            
+            if not st.session_state.models:
+                validation_errors.append("至少需要配置一个模型")
+                valid = False
+                
+            for i, player in enumerate(st.session_state.players):
+                if not player["model"]:
+                    validation_errors.append(f"玩家 {i+1} 未选择模型")
+                    valid = False
+                if player["model"] not in [m["name"] for m in st.session_state.models]:
+                    validation_errors.append(f"玩家 {i+1} 使用的模型不存在")
+                    valid = False
+            
+            # 显示验证结果
+            if validation_errors:
+                st.error("配置存在问题：\n- " + "\n- ".join(validation_errors))
+            else:
+                st.success("所有配置验证通过！")
+            
+            # 游戏启动按钮
+            if valid and st.button("🚀 启动游戏", type="primary", use_container_width=True):
+                if 1:
+                    # 构建配置数据
+                    config = {
+                        "apis": {m["name"]: m for m in st.session_state.models},
+                        "players_info": {
+                            str(i+1): {"model": p["model"], "role": p["role"]}
+                            for i, p in enumerate(st.session_state.players)
+                        },
+                        "instructions": st.session_state.instructions
+                    }
+                    config["players_info"]["0"] = f"这是一局有{len(st.session_state.players)}名玩家的狼人杀游戏，其中有"
+                    players_count = {}
+                    for i in st.session_state.players:
+                        players_count[i["role"]] = players_count.get(i["role"], 0) + 1
+                    for i in players_count:
+                        config["players_info"]["0"] += f"{players_count[i]}名{i}，"
+                    config["players_info"]["0"] = config["players_info"]["0"][:-1] + "。"
+
                     # 创建游戏对象
                     game = Game(
-                        game_name,
-                        player_info.getvalue(),
-                        apis.getvalue(),
-                        instructions.getvalue(),
-                        webui_mode=True
+                        game_name=game_name,
+                        players_info_path=config["players_info"],
+                        apis_path=config["apis"],
+                        instructions_path=config["instructions"],
+                        webui_mode=True,
+                        from_dict=True
                     )
                     
-                    # 保存到session state
+                    # 保存游戏状态
                     st.session_state.game = game
                     st.session_state.current_page = 'game'
-                    # 在创建游戏对象后添加以下代码
-                    st.session_state.initialized = True  # <-- 新增这一行
-                    st.session_state.log_cache = []
-                    st.session_state.phase_thread = None
-                    st.session_state.phase_progress = None
+                    st.session_state.initialized = True
                     st.rerun()
-                except Exception as e:
-                    st.error(f"游戏创建失败：{str(e)}")
-            else:
-                st.error("请上传所有配置文件！")
+    if 'alert_message' in st.session_state:
+        st.components.v1.html(f"""
+        <script>
+            alert("{st.session_state.alert_message}");
+        </script>
+        """)
+        del st.session_state.alert_message  # 显示后立即清除
 
 
 def format_log_message(context, game):
@@ -98,7 +511,7 @@ def format_log_message(context, game):
         import re
         content = re.sub(
             r'<think>\s*\n(.*?)\n</think>',  # 匹配思考内容
-            r'<details style="margin-top: 5px;"><summary>🤔 思考结束（点击展开）...</summary><div style="padding: 8px; background: rgba(0,0,0,0.05);">\1</div></details>',
+            r'<details style="margin-top: 5px;"><summary>🤔 思考结束（点击展开）</summary><div style="padding: 8px; background: rgba(0,0,0,0.05);">\1</div></details>',
             content,
             flags=re.DOTALL
         )
@@ -127,15 +540,49 @@ def format_log_message(context, game):
 
 
 def game_page():
-    st.title("🎭 狼人杀对局进行中")
+    def on_close():
+        """页面关闭时的清理函数"""
+        if hasattr(st.session_state, 'phase_thread') and st.session_state.phase_thread:
+            if st.session_state.phase_thread.is_alive():
+                if st.session_state.phase_progress:
+                    st.session_state.phase_progress.put("STOP")
+                st.session_state.phase_thread.join(timeout=1)
+        st.session_state.game = None
+        st.session_state.initialized = False
+
+    # 添加页面关闭检测逻辑（在game_page()函数内）
+    st.components.v1.html("""
+    <script>
+    window.addEventListener('beforeunload', function(e) {
+        fetch('/_stcore/_close_session', { method: 'POST' });
+    });
+    </script>
+    """)
+
+    st.set_page_config(page_title="狼人杀😋", page_icon="🐺", layout="wide", initial_sidebar_state="collapsed", menu_items={"About":"https://github.com/xxh16384/LLMsWerewolves"})
+    st.title("🎭 狼人杀！")
     game = st.session_state.game
 
     # 侧边栏显示控制按钮
     with st.sidebar:
         if st.button("↩️ 返回配置"):
+            # 安全终止线程的逻辑
+            if hasattr(st.session_state, 'phase_thread') and st.session_state.phase_thread:
+                if st.session_state.phase_thread.is_alive():
+                    # 发送终止信号
+                    if st.session_state.phase_progress:
+                        st.session_state.phase_progress.put("STOP")
+                    # 等待线程结束
+                    st.session_state.phase_thread.join(timeout=2)
+                    # 强制清除
+                    if st.session_state.phase_thread.is_alive():
+                        st.session_state.phase_thread = None
+                        st.rerun()
+
+            # 重置游戏状态
             st.session_state.current_page = 'config'
             st.session_state.game = None
-            st.session_state.initialized = False  # <-- 新增重置初始化状态
+            st.session_state.initialized = False
             st.rerun()
 
 
@@ -195,24 +642,44 @@ def game_page():
 
                     def run_phase(progress_queue):
                         try:
+                            while not progress_queue.empty():
+                                msg = progress_queue.get()
+                                if msg == "STOP":
+                                    return
+                            
                             game.day_night_change()
-                            days, phase = game.get_game_stage()
+                            if not progress_queue.empty() and progress_queue.get() == "STOP":
+                                return
 
+                            days, phase = game.get_game_stage()
+                            
                             if not phase:
                                 game.werewolf_killing()
+                                if not progress_queue.empty() and progress_queue.get() == "STOP":
+                                    return
+                                
                                 game.seer_seeing()
+                                if not progress_queue.empty() and progress_queue.get() == "STOP":
+                                    return
+                                
                                 game.witch_operation()
                             else:
                                 game.public_discussion()
+                                if not progress_queue.empty() and progress_queue.get() == "STOP":
+                                    return
+                                
                                 result = game.vote()
                                 game.out([find_max_key(result)])
+                                
                         except Exception as e:
                             st.error(f"阶段处理失败：{e}")
                         finally:
+                            if not progress_queue.empty():
+                                progress_queue.get()  # 清理队列
                             progress_queue.put("done")
 
-                    st.session_state.phase_thread = Thread(target=run_phase, args=(phase_progress,))
-                    st.session_state.phase_thread.start()
+                        st.session_state.phase_thread = Thread(target=run_phase, args=(phase_progress,),daemon=True)
+                        st.session_state.phase_thread.start()
 
             def monitor_phase(progress_queue):
                 start_time = time.time()
@@ -243,6 +710,13 @@ def game_page():
 
         with tab2:  # 玩家状态选项卡
             st.empty()
+        if 'alert_message' in st.session_state:
+            st.components.v1.html(f"""
+            <script>
+                alert("{st.session_state.alert_message}");
+            </script>
+            """)
+            del st.session_state.alert_message
 
     else:
         st.info("请先创建游戏")
@@ -250,13 +724,20 @@ def game_page():
 
 def main():
     init_session_state()
-
-    if st.session_state.current_page == 'config':
-        config_page()
-    elif st.session_state.current_page == 'game' and st.session_state.game:
-        game_page()
-    else:
-        st.warning("游戏初始化失败，请返回配置页面")
+    
+    try:
+        if st.session_state.current_page == 'config':
+            config_page()
+        elif st.session_state.current_page == 'game' and st.session_state.game:
+            game_page()
+        else:
+            st.warning("游戏初始化失败，请返回配置页面")
+    finally:
+        # 全局清理逻辑
+        if 'phase_thread' in st.session_state:
+            if st.session_state.phase_thread.is_alive():
+                st.session_state.phase_progress.put("STOP")
+                st.session_state.phase_thread.join(timeout=1)
 
 if __name__ == "__main__":
     main()
