@@ -93,7 +93,8 @@ with st.sidebar:
         "player_info":st.file_uploader("上传玩家信息（player_info.json）", type=["json"]),
         "apis":st.file_uploader("上传API配置（apis.json）", type=["json"])
     }
-    
+
+
     if st.button("创建新游戏"):
         with st.spinner("初始化游戏..."), st.session_state.game_lock:
             st.session_state.game = None

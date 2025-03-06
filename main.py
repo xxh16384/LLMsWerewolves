@@ -130,7 +130,7 @@ class Context:
         v_id.discard(0)
         if self.source_id == 0:
             return f"上帝:{self.content}（{v_id}可见）\n"
-        return f"{self.game.get_players_by_ids([self.source_id])[0]}:{self.content}（{v_id}可见）\n"
+        return f"{self.source_id}号玩家:{self.content}（{v_id}可见）\n"
 
 class Player:
     def __init__(self,model:str,role:str,id:int,game):
