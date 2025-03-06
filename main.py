@@ -289,6 +289,9 @@ class Player:
                             c(reasoning_message)
                         except:
                             reasoning_model = 0
+                            chunk_message = chunk.choices[0].delta.content
+                            c(chunk_message)
+                            collected_messages += chunk_message
                     elif reasoning_model == 1:
                         reasoning_message = chunk.choices[0].delta.reasoning_content
                         chunk_message = chunk.choices[0].delta.content

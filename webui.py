@@ -101,17 +101,24 @@ with st.sidebar:
             st.session_state.phase_thread = None
             st.session_state.phase_progress = None
             st.session_state.initialized = False
-            
-            st.session_state.game = Game(
-                game_name,
-                files["player_info"].getvalue(),
-                files["apis"].getvalue(),
-                files["instructions"].getvalue(),
-                webui_mode=True
-            )
-            st.session_state.initialized = True
-            st.session_state.log_container = st.empty()
-            st.success(f"游戏 {game_name} 创建成功！")
+            try:
+                st.session_state.game = Game(
+                    game_name,
+                    files["player_info"].getvalue(),
+                    files["apis"].getvalue(),
+                    files["instructions"].getvalue(),
+                    webui_mode=True
+                )
+                st.session_state.initialized = True
+                st.session_state.log_container = st.empty()
+                st.success(f"游戏 {game_name} 创建成功！")
+            except Exception as e:
+                if all(files.values()):
+                    st.error("请检查上传的文件是否正确！")
+                elif not all(files.values()):
+                    st.error("请上传所有文件！")
+                else:
+                    st.error(f"创建游戏失败：{e}")
 
 if st.session_state.game and st.session_state.initialized:
     game = st.session_state.game
@@ -120,21 +127,20 @@ if st.session_state.game and st.session_state.initialized:
     tab1, tab2 = st.tabs(["💬 聊天日志", "👥 玩家状态"])
 
     with tab1:  # 聊天日志选项卡
-        st.subheader("看看你们都在聊什么！")
         days, phase = game.get_game_stage()
         st.info(f"当前阶段：第{days}天 {'☀️ 白天' if phase else '🌙 夜晚'}")
-        
+
         # 日志容器
         log_container = st.empty()
-        
+
         def update_logs():
             current_logs = Context.contexts.get(game, [])
             new_logs = current_logs[len(st.session_state.log_cache):]
-            
+
             formatted_logs = "".join([str(format_log_message(c, game)) for c in st.session_state.log_cache + new_logs])
-            
+
             log_container.markdown(f"""
-            <div id="log-container" style="overflow-y: auto;">
+            <div id="log-container" style="overflow-y: auto;max-height: 60vh;">
                 {formatted_logs}
             </div>
             """, unsafe_allow_html=True)
@@ -144,7 +150,6 @@ if st.session_state.game and st.session_state.initialized:
             window.location.hash = "存活玩家状态";
             </script>""", height=0)
             with tab2:
-                st.subheader("玩家实时状态")
                 days, phase = game.get_game_stage()
                 st.info(f"当前阶段：第{days}天 {'☀️ 白天' if phase else '🌙 夜晚'}")
                 players = game.get_players(alive=False)
@@ -165,15 +170,15 @@ if st.session_state.game and st.session_state.initialized:
                     if st.session_state.phase_progress:
                         st.session_state.phase_progress.put("skip")
                     st.session_state.phase_thread.join(timeout=2)
-                
+
                 phase_progress = Queue()
                 st.session_state.phase_progress = phase_progress
-                
+
                 def run_phase(progress_queue):
                     try:
                         game.day_night_change()
                         days, phase = game.get_game_stage()
-                        
+
                         if not phase:
                             game.werewolf_killing()
                             game.seer_seeing()
@@ -182,9 +187,11 @@ if st.session_state.game and st.session_state.initialized:
                             game.public_discussion()
                             result = game.vote()
                             game.out([find_max_key(result)])
+                    except Exception as e:
+                        st.error(f"阶段处理失败：{e}")
                     finally:
                         progress_queue.put("done")
-                
+
                 st.session_state.phase_thread = Thread(target=run_phase, args=(phase_progress,))
                 st.session_state.phase_thread.start()
 
@@ -193,10 +200,10 @@ if st.session_state.game and st.session_state.initialized:
             while time.time() - start_time < 60:
                 with st.session_state.game_lock:
                     update_logs()
-                
+
                 time.sleep(2)
                 st.rerun()
-                
+
                 try:
                     if progress_queue.get_nowait() == "done":
                         break
