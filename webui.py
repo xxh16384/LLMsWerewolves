@@ -31,17 +31,61 @@ ROLE_ICONS = {
     "未知":"❓"
 }
 
-# 初始化session状态
 def init_session_state():
-    if 'initialized' not in st.session_state:
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = 'config'
+    if 'game' not in st.session_state:
         st.session_state.game = None
+    # 新增以下初始化语句
+    if 'initialized' not in st.session_state:
+        st.session_state.initialized = False
+    if 'log_cache' not in st.session_state:
         st.session_state.log_cache = []
+    if 'game_lock' not in st.session_state:
         st.session_state.game_lock = Lock()
+    if 'phase_thread' not in st.session_state:
         st.session_state.phase_thread = None
+    if 'phase_progress' not in st.session_state:
         st.session_state.phase_progress = None
-        st.session_state.initialized = True
 
-init_session_state()
+# 配置页面
+def config_page():
+    st.title("⚙️ 游戏配置")
+    
+    with st.form("game_config"):
+        # 游戏基础配置
+        game_name = st.text_input("游戏名称", "狼人杀游戏1")
+        instructions = st.file_uploader("游戏提示词（instructions.json）", type=["json"])
+        player_info = st.file_uploader("玩家信息（player_info.json）", type=["json"])
+        apis = st.file_uploader("API配置（apis.json）", type=["json"])
+
+        # 提交按钮
+        if st.form_submit_button("🚀 开始游戏"):
+            if all([instructions, player_info, apis]):
+                try:
+                    # 创建游戏对象
+                    game = Game(
+                        game_name,
+                        player_info.getvalue(),
+                        apis.getvalue(),
+                        instructions.getvalue(),
+                        webui_mode=True
+                    )
+                    
+                    # 保存到session state
+                    st.session_state.game = game
+                    st.session_state.current_page = 'game'
+                    # 在创建游戏对象后添加以下代码
+                    st.session_state.initialized = True  # <-- 新增这一行
+                    st.session_state.log_cache = []
+                    st.session_state.phase_thread = None
+                    st.session_state.phase_progress = None
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"游戏创建失败：{str(e)}")
+            else:
+                st.error("请上传所有配置文件！")
+
 
 def format_log_message(context, game):
     role = "上帝" if context.source_id == 0 else next(
@@ -81,150 +125,138 @@ def format_log_message(context, game):
     </div>
 </div>"""
 
-# 主界面
-st.title("🎭 狼人杀AI对局系统")
 
-# 侧边栏控制
-with st.sidebar:
-    st.title("🎮 游戏配置")
-    game_name = st.text_input("输入游戏名称", "狼人杀游戏1")
-    files = {
-        "instructions":st.file_uploader("上传游戏提示词（instructions.json）", type=["json"]),
-        "player_info":st.file_uploader("上传玩家信息（player_info.json）", type=["json"]),
-        "apis":st.file_uploader("上传API配置（apis.json）", type=["json"])
-    }
-
-
-    if st.button("创建新游戏"):
-        with st.spinner("初始化游戏..."), st.session_state.game_lock:
-            st.session_state.game = None
-            st.session_state.log_cache = []
-            st.session_state.phase_thread = None
-            st.session_state.phase_progress = None
-            st.session_state.initialized = False
-            try:
-                st.session_state.game = Game(
-                    game_name,
-                    files["player_info"].getvalue(),
-                    files["apis"].getvalue(),
-                    files["instructions"].getvalue(),
-                    webui_mode=True
-                )
-                st.session_state.initialized = True
-                st.session_state.log_container = st.empty()
-                st.success(f"游戏 {game_name} 创建成功！")
-            except Exception as e:
-                if all(files.values()):
-                    st.error("请检查上传的文件是否正确！")
-                elif not all(files.values()):
-                    st.error("请上传所有文件！")
-                else:
-                    st.error(f"创建游戏失败：{e}")
-
-if st.session_state.game and st.session_state.initialized:
+def game_page():
+    st.title("🎭 狼人杀对局进行中")
     game = st.session_state.game
 
-    # 创建选项卡布局
-    tab1, tab2 = st.tabs(["💬 聊天日志", "👥 玩家状态"])
+    # 侧边栏显示控制按钮
+    with st.sidebar:
+        if st.button("↩️ 返回配置"):
+            st.session_state.current_page = 'config'
+            st.session_state.game = None
+            st.session_state.initialized = False  # <-- 新增重置初始化状态
+            st.rerun()
 
-    with tab1:  # 聊天日志选项卡
-        days, phase = game.get_game_stage()
-        st.info(f"当前阶段：第{days}天 {'☀️ 白天' if phase else '🌙 夜晚'}")
 
-        # 日志容器
-        log_container = st.empty()
+    if st.session_state.game and st.session_state.initialized:
+        game = st.session_state.game
 
-        def update_logs():
-            current_logs = Context.contexts.get(game, [])
-            new_logs = current_logs[len(st.session_state.log_cache):]
+        # 创建选项卡布局
+        tab1, tab2 = st.tabs(["💬 聊天日志", "👥 玩家状态"])
 
-            formatted_logs = "".join([str(format_log_message(c, game)) for c in st.session_state.log_cache + new_logs])
+        with tab1:  # 聊天日志选项卡
+            days, phase = game.get_game_stage()
+            st.info(f"当前阶段：第{days}天 {'☀️ 白天' if phase else '🌙 夜晚'}")
 
-            log_container.markdown(f"""
-            <div id="log-container" style="overflow-y: auto;max-height: 60vh;">
-                {formatted_logs}
-            </div>
-            """, unsafe_allow_html=True)
+            # 日志容器
+            log_container = st.empty()
 
-            st.session_state.log_cache = current_logs.copy()
-            st.components.v1.html("""<script>
-            window.location.hash = "存活玩家状态";
-            </script>""", height=0)
-            with tab2:
-                days, phase = game.get_game_stage()
-                st.info(f"当前阶段：第{days}天 {'☀️ 白天' if phase else '🌙 夜晚'}")
-                players = game.get_players(alive=False)
-                cols = st.columns(3)
-                for i, player in enumerate(players):
-                    with cols[i % 3]:
-                        role_color = ROLE_COLORS.get(player.role, "#FFF")
-                        st.markdown(f"""<div style='text-align: center; padding: 12px; border-radius: 12px; background-color: {role_color};'>
-                            <h4>玩家{player.id}</h4>
-                            <p>{ROLE_ICONS.get(player.role,"❓")}</p>
-                            <p>{'✅ 存活' if player.alive else '❌ 出局'}</p>
-                        </div>""", unsafe_allow_html=True)
+            def update_logs():
+                current_logs = Context.contexts.get(game, [])
+                new_logs = current_logs[len(st.session_state.log_cache):]
 
-        # 阶段控制按钮
-        if st.button("进入下一阶段"):
-            with st.spinner("处理阶段..."), st.session_state.game_lock:
-                if st.session_state.phase_thread and st.session_state.phase_thread.is_alive():
-                    if st.session_state.phase_progress:
-                        st.session_state.phase_progress.put("skip")
-                    st.session_state.phase_thread.join(timeout=2)
+                formatted_logs = "".join([str(format_log_message(c, game)) for c in st.session_state.log_cache + new_logs])
 
-                phase_progress = Queue()
-                st.session_state.phase_progress = phase_progress
+                log_container.markdown(f"""
+                <div id="log-container" style="overflow-y: auto;max-height: 60vh;">
+                    {formatted_logs}
+                </div>
+                """, unsafe_allow_html=True)
 
-                def run_phase(progress_queue):
+                st.session_state.log_cache = current_logs.copy()
+                st.components.v1.html("""<script>
+                window.location.hash = "存活玩家状态";
+                </script>""", height=0)
+                with tab2:
+                    days, phase = game.get_game_stage()
+                    st.info(f"当前阶段：第{days}天 {'☀️ 白天' if phase else '🌙 夜晚'}")
+                    players = game.get_players(alive=False)
+                    cols = st.columns(3)
+                    for i, player in enumerate(players):
+                        with cols[i % 3]:
+                            role_color = ROLE_COLORS.get(player.role, "#FFF")
+                            st.markdown(f"""<div style='text-align: center; padding: 12px; border-radius: 12px; background-color: {role_color};'>
+                                <h4>玩家{player.id}</h4>
+                                <p>{ROLE_ICONS.get(player.role,"❓")}</p>
+                                <p>{'✅ 存活' if player.alive else '❌ 出局'}</p>
+                            </div>""", unsafe_allow_html=True)
+
+            # 阶段控制按钮
+            if st.button("⏭️ 进入下一阶段"):
+                with st.spinner("处理阶段..."), st.session_state.game_lock:
+                    if st.session_state.phase_thread and st.session_state.phase_thread.is_alive():
+                        if st.session_state.phase_progress:
+                            st.session_state.phase_progress.put("skip")
+                        st.session_state.phase_thread.join(timeout=2)
+
+                    phase_progress = Queue()
+                    st.session_state.phase_progress = phase_progress
+
+                    def run_phase(progress_queue):
+                        try:
+                            game.day_night_change()
+                            days, phase = game.get_game_stage()
+
+                            if not phase:
+                                game.werewolf_killing()
+                                game.seer_seeing()
+                                game.witch_operation()
+                            else:
+                                game.public_discussion()
+                                result = game.vote()
+                                game.out([find_max_key(result)])
+                        except Exception as e:
+                            st.error(f"阶段处理失败：{e}")
+                        finally:
+                            progress_queue.put("done")
+
+                    st.session_state.phase_thread = Thread(target=run_phase, args=(phase_progress,))
+                    st.session_state.phase_thread.start()
+
+            def monitor_phase(progress_queue):
+                start_time = time.time()
+                while time.time() - start_time < 60:
+                    with st.session_state.game_lock:
+                        update_logs()
+
+                    time.sleep(2)
+                    st.rerun()
+
                     try:
-                        game.day_night_change()
-                        days, phase = game.get_game_stage()
+                        if progress_queue.get_nowait() == "done":
+                            break
+                    except:
+                        continue
 
-                        if not phase:
-                            game.werewolf_killing()
-                            game.seer_seeing()
-                            game.witch_operation()
-                        else:
-                            game.public_discussion()
-                            result = game.vote()
-                            game.out([find_max_key(result)])
-                    except Exception as e:
-                        st.error(f"阶段处理失败：{e}")
-                    finally:
-                        progress_queue.put("done")
+            if st.session_state.phase_thread and st.session_state.phase_thread.is_alive():
+                with st.spinner("响应中..."):
+                    if st.session_state.phase_progress:
+                        monitor_phase(st.session_state.phase_progress)
+                
+                if game.game_over():
+                    st.balloons()
+                    st.success("游戏结束！")
+                    st.stop()
+            else:
+                update_logs()
 
-                st.session_state.phase_thread = Thread(target=run_phase, args=(phase_progress,))
-                st.session_state.phase_thread.start()
+        with tab2:  # 玩家状态选项卡
+            st.empty()
 
-        def monitor_phase(progress_queue):
-            start_time = time.time()
-            while time.time() - start_time < 60:
-                with st.session_state.game_lock:
-                    update_logs()
+    else:
+        st.info("请先创建游戏")
+        
 
-                time.sleep(2)
-                st.rerun()
+def main():
+    init_session_state()
 
-                try:
-                    if progress_queue.get_nowait() == "done":
-                        break
-                except:
-                    continue
+    if st.session_state.current_page == 'config':
+        config_page()
+    elif st.session_state.current_page == 'game' and st.session_state.game:
+        game_page()
+    else:
+        st.warning("游戏初始化失败，请返回配置页面")
 
-        if st.session_state.phase_thread and st.session_state.phase_thread.is_alive():
-            with st.spinner("响应中..."):
-                if st.session_state.phase_progress:
-                    monitor_phase(st.session_state.phase_progress)
-            
-            if game.game_over():
-                st.balloons()
-                st.success("游戏结束！")
-                st.stop()
-        else:
-            update_logs()
-
-    with tab2:  # 玩家状态选项卡
-        st.empty()
-
-else:
-    st.info("请先创建游戏")
+if __name__ == "__main__":
+    main()
