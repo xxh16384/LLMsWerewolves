@@ -774,7 +774,7 @@ class Game:
 
         self.stage += 1
         days,morning_dusk = self.get_game_stage()
-        self.broadcast(f"现在是第{days}天{"白天" if morning_dusk else "晚上"}")
+        self.broadcast(f"现在是第{days}天{'白天' if morning_dusk else '晚上'}")
         if morning_dusk == 1 and days > 1:
             if self.kill_tonight:
                 self.broadcast(f"昨晚{self.kill_tonight}号玩家被杀了")
@@ -811,7 +811,7 @@ class Game:
         return hash(self.id)
 
     def __str__(self):
-        return f"{self.game_name}：第{self.get_game_stage()[0]}天{"白天" if self.get_game_stage()[1] else "晚上"}"
+        return f"{self.game_name}：第{self.get_game_stage()[0]}天{'白天' if self.get_game_stage()[1] else '晚上'}"
 
     def __eq__(self, value):
         return self.id == value.id
