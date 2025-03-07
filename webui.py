@@ -1,5 +1,5 @@
 import streamlit as st
-from main import Game, Context, find_max_key,read_json
+from main import Game, Context, find_max_key, read_json
 import time
 from threading import Thread, Lock, Event
 from queue import Queue
@@ -211,16 +211,6 @@ def config_page():
                 except Exception as e:
                     st.error(f"配置导入失败: {str(e)}")
 
-        # 开发工具区域
-        with st.expander("⚙️ 开发工具", expanded=False):
-            if st.button("🔄 强制刷新页面", help="清除所有缓存数据", use_container_width=True):
-                st.session_state.clear()
-                st.rerun()
-            if st.toggle("调试模式", help="显示详细日志信息"):
-                st.session_state.debug_mode = True
-            else:
-                st.session_state.debug_mode = False
-
 
     st.title("⚙️ 游戏配置 - 分步设置")
 
@@ -296,15 +286,15 @@ def config_page():
     elif current_step == steps[1]:
         with st.container(border=True):
             st.subheader("👥 玩家配置")
-            
+
             # 玩家数量控制
-            num_players = st.number_input("玩家数量", 
-                                        min_value=4, 
-                                        max_value=18, 
+            num_players = st.number_input("玩家数量",
+                                        min_value=4,
+                                        max_value=18,
                                         value=len(st.session_state.players) if st.session_state.players else 8,
                                         step=1,
-                                        key="player_num")
-            
+                                        key="player_num_control")
+
             # 动态调整玩家列表
             if len(st.session_state.players) != num_players:
                 new_players = []
@@ -314,16 +304,17 @@ def config_page():
                     else:
                         new_players.append({"role": "villager", "model": ""})
                 st.session_state.players = new_players
-            
+                st.session_state.player_num = num_players
+
             # 角色选项配置
             roles = ["werewolf", "villager", "witch", "seer"]
             role_names = {
                 "werewolf": "🐺 狼人",
-                "villager": "👨🌾 村民", 
+                "villager": "👨🌾 村民",
                 "witch": "🧙♀ 女巫",
                 "seer": "🔮 预言家"
             }
-            
+
             # 生成玩家配置项
             cols = st.columns(4)
             for i in range(num_players):
@@ -471,7 +462,7 @@ def config_page():
                     config["players_info"]["0"] = f"这是一局有{len(st.session_state.players)}名玩家的狼人杀游戏，其中有"
                     players_count = {}
                     for i in st.session_state.players:
-                        players_count[i["role"]] = players_count.get(i["role"], 0) + 1
+                        players_count[player_role_to_chinese[i["role"]]] = players_count.get(i["role"], 0) + 1
                     for i in players_count:
                         config["players_info"]["0"] += f"{players_count[i]}名{i}，"
                     config["players_info"]["0"] = config["players_info"]["0"][:-1] + "。"
@@ -554,10 +545,10 @@ def game_page():
                 if st.session_state.phase_thread.is_alive():
                     # 发送终止信号
                     if st.session_state.phase_progress:
-                        st.session_state.phase_progress.put("STOP")
+                        st.session_state.phase_progress.set()
                     # 等待线程结束
                     with st.spinner("正在终止线程..."):
-                        st.session_state.phase_thread.join(timeout=5)
+                        st.session_state.phase_thread.join(timeout=10)
                     # 强制清除
                     with st.spinner("强制终止线程..."):
                         if st.session_state.phase_thread.is_alive():
@@ -568,8 +559,8 @@ def game_page():
             st.session_state.current_page = 'config'
             st.session_state.game = None
             st.session_state.initialized = False
+            st.session_state.log_cache = []
             st.rerun()
-
 
     if st.session_state.game and st.session_state.initialized:
         game = st.session_state.game
@@ -603,8 +594,6 @@ def game_page():
                 st.components.v1.html("""<script>
                 window.location.hash = "存活玩家状态";
                 </script>""", height=0)
-                with tab2:  # 玩家状态选项卡
-                    st.empty()
                 with tab2:
                     days, phase = game.get_game_stage()
                     st.info(f"当前阶段：第{days}天 {'☀️ 白天' if phase else '🌙 夜晚'}")
@@ -618,79 +607,6 @@ def game_page():
                                 <p>{ROLE_ICONS.get(player.role,"❓")}</p>
                                 <p>{'✅ 存活' if player.alive else '❌ 出局'}</p>
                             </div>""", unsafe_allow_html=True)
-            # update_logs()
-
-            # 阶段控制按钮
-            if game.game_over() or st.button("⏭️ 进入下一阶段"):
-                with st.spinner("处理阶段..."), st.session_state.game_lock:
-                    if st.session_state.phase_thread and st.session_state.phase_thread.is_alive():
-                        if st.session_state.phase_progress:
-                            st.session_state.phase_progress.put("skip")
-                        st.session_state.phase_thread.join(timeout=2)
-
-                    phase_progress = Queue()
-                    st.session_state.phase_progress = phase_progress
-
-                    def run_phase(progress_queue):
-                        try:
-                            while not progress_queue.empty():
-                                msg = progress_queue.get()
-                                if msg == "STOP" or game.game_over() or msg == "skip":
-                                    return
-                            if (not progress_queue.empty() and progress_queue.get() == "STOP") or game.game_over():
-                                return
-                            game.day_night_change()
-                            if (not progress_queue.empty() and progress_queue.get() == "STOP") or game.game_over():
-                                return
-
-                            days, phase = game.get_game_stage()
-                            
-                            if not phase:
-                                game.werewolf_killing()
-                                if not progress_queue.empty() and progress_queue.get() == "STOP":
-                                    return
-                                
-                                game.seer_seeing()
-                                if not progress_queue.empty() and progress_queue.get() == "STOP":
-                                    return
-                                
-                                game.witch_operation()
-                            else:
-                                game.public_discussion()
-                                if not progress_queue.empty() and progress_queue.get() == "STOP":
-                                    return
-                                
-                                result = game.vote()
-                                game.out([find_max_key(result)])
-                                
-                        except Exception as e:
-                            st.error(f"阶段处理失败：{e}")
-                        finally:
-                            if not progress_queue.empty():
-                                progress_queue.get()  # 清理队列
-                            progress_queue.put("done")
-
-                    st.session_state.phase_thread = Thread(target=run_phase, args=(phase_progress,),daemon=True)
-                    st.session_state.phase_thread.start()
-
-            def monitor_phase(progress_queue):
-                while st.session_state.phase_thread.is_alive():
-                    update_logs()
-                    time.sleep(2)
-                    st.rerun()
-                    try:
-                        if progress_queue.get_nowait() == "done":
-                            break
-                    except:
-                        continue
-                update_logs()
-                st.rerun()
-
-            if st.session_state.phase_thread and st.session_state.phase_thread.is_alive():
-                with st.spinner("响应中..."):
-                    if st.session_state.phase_progress:
-                        monitor_phase(st.session_state.phase_progress)
-
 
             if game.game_over():
                 st.balloons()
@@ -698,6 +614,95 @@ def game_page():
                 st.success("游戏结束！")
                 update_logs()
                 st.stop()
+                st.rerun()
+            
+            # 阶段控制按钮
+            if not game.game_over():
+                btn = st.button("⏭️ 进入下一阶段", 
+                            disabled=game.game_over(),
+                            help="游戏已结束" if game.game_over() else "进入下一阶段")
+            else:
+                btn = False
+            if btn:
+                with st.spinner("处理阶段..."), st.session_state.game_lock:
+                    # 二次验证游戏状态（防止点击瞬间状态变化）
+                    if game.game_over():
+                        st.rerun()
+                        return
+                    
+                    phase_progress = Event()
+                    st.session_state.phase_progress = phase_progress
+
+                    def run_phase(progress_event):
+                        try:
+                            while not (progress_event.is_set() or game.game_over()):
+                                # 每次循环前检查游戏状态
+                                if game.game_over():
+                                    progress_event.set()
+                                    return
+                                
+                                game.day_night_change()
+                                days, phase = game.get_game_stage()
+
+                                if not phase:
+                                    # 每个操作前检查状态
+                                    if not game.game_over(): game.werewolf_killing()
+                                    if not game.game_over(): game.seer_seeing()
+                                    if not game.game_over(): game.witch_operation()
+                                else:
+                                    if not game.game_over(): game.public_discussion()
+                                    if not game.game_over():
+                                        result = game.vote()
+                                        game.out([find_max_key(result)])
+                                
+                                # 每次操作后立即检查
+                                if game.game_over():
+                                    progress_event.set()
+                                    return
+
+                        except Exception as e:
+                            st.error(f"阶段处理失败：{e}")
+                        finally:
+                            progress_event.set()
+
+                    # 启动线程前再次检查
+                    if not game.game_over():
+                        st.session_state.phase_thread = Thread(target=run_phase, args=(phase_progress,), daemon=True)
+                        st.session_state.phase_thread.start()
+            if game.game_over():
+                st.balloons()
+                game.get_winner()
+                st.success("游戏结束！")
+                update_logs()
+                st.stop()
+                st.rerun()
+
+            def monitor_phase(progress_event):
+                while True:
+                    # 双重终止条件 + 游戏状态检查
+                    if progress_event.is_set() or game.game_over():
+                        progress_event.set()  # 确保传播终止信号
+                        break
+                    
+                    with st.session_state.game_lock:
+                        update_logs()
+                    
+                    time.sleep(2)
+                    st.rerun()
+                update_logs()
+
+            if st.session_state.phase_thread and st.session_state.phase_thread.is_alive():
+                with st.spinner("响应中..."):
+                    if st.session_state.phase_progress:
+                        monitor_phase(st.session_state.phase_progress)
+
+        if game.game_over():
+            st.balloons()
+            game.get_winner()
+            st.success("游戏结束！")
+            update_logs()
+            st.stop()
+            st.rerun()
 
         if 'alert_message' in st.session_state:
             st.components.v1.html(f"""
@@ -706,6 +711,8 @@ def game_page():
             </script>
             """)
             del st.session_state.alert_message
+            
+        update_logs()
 
     else:
         st.info("请先创建游戏")
@@ -723,9 +730,9 @@ def main():
             st.warning("游戏初始化失败，请返回配置页面")
     finally:
         # 修复后的全局清理逻辑
-        if 'phase_thread' in st.session_state and st.session_state.phase_thread is not None:
+        if not st.session_state.game and 'phase_thread' in st.session_state and st.session_state.phase_thread is not None:
             if st.session_state.phase_thread.is_alive():
-                st.session_state.phase_progress.put("STOP")
+                st.session_state.phase_progress.set()
                 st.session_state.phase_thread.join(timeout=1)
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ from openai import OpenAI
 import json
 import logging
 import os
+import time
 
 # 工具函数
 def read_json(file_path):
@@ -360,7 +361,6 @@ class Player:
         return f"玩家{self.id}（{self.role}）"
 
 class Game:
-    ids = 0
     def __init__(self,game_name,players_info_path,apis_path,instructions_path,webui_mode = False,from_dict = False):
         """
         Initialize a new game instance.
@@ -382,7 +382,8 @@ class Game:
             kill_tonight (list): the players to be killed tonight
         """
         self.game_name = game_name
-        self.set_logger(game_name)
+        self.id = time.time()
+        self.set_logger()
 
         if webui_mode and not from_dict:
             self.instructions = json.loads(instructions_path.decode())
@@ -397,14 +398,12 @@ class Game:
             self.apis = read_json(apis_path)
             self.players_info = read_json(players_info_path)
         self.players = []
-        self.id = Game.ids
-        Game.ids += 1
         self.init_game()
         self.stage = 0
         self.kill_tonight = []
         self.webui_mode = webui_mode
 
-    def set_logger(self, game_name):
+    def set_logger(self):
         """
         Set up the logger for the game.
 
@@ -417,7 +416,7 @@ class Game:
         Returns:
             None
         """
-        logger = logging.getLogger(game_name)
+        logger = logging.getLogger(str(self.id))
         logger.setLevel(logging.DEBUG)
 
         # 创建控制台处理器 (Console Handler)
@@ -427,8 +426,9 @@ class Game:
         # 创建文件处理器 (File Handler)
         if not os.path.exists("./log"):
             os.mkdir("./log")
-        log_file_path = f"./log/{game_name}.md"
+        log_file_path = f"./log/{self.game_name}-id={self.id}.md"
         fh = logging.FileHandler(log_file_path, encoding="UTF-8")
+        fh.setLevel(logging.INFO)
         fh.setFormatter(logging.Formatter(
             '**%(asctime)s - %(levelname)s**\n%(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
@@ -445,7 +445,7 @@ class Game:
 
         # 初始化日志文件内容
         with open(log_file_path, "w", encoding="UTF-8") as f:
-            f.write(f"# {game_name}\n\n")
+            f.write(f"# {self.game_name}\n\n")
 
         self.logger = logger
 
