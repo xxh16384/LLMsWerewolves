@@ -455,7 +455,7 @@ def config_page():
                 st.error("配置存在问题：\n- " + "\n- ".join(validation_errors))
             else:
                 st.success("所有配置验证通过！")
-            
+
             # 游戏启动按钮
             if valid and st.button("🚀 启动游戏", type="primary", use_container_width=True):
                 if 1:
@@ -540,26 +540,9 @@ def format_log_message(context, game):
 
 
 def game_page():
-    def on_close():
-        """页面关闭时的清理函数"""
-        if hasattr(st.session_state, 'phase_thread') and st.session_state.phase_thread:
-            if st.session_state.phase_thread.is_alive():
-                if st.session_state.phase_progress:
-                    st.session_state.phase_progress.put("STOP")
-                st.session_state.phase_thread.join(timeout=1)
-        st.session_state.game = None
-        st.session_state.initialized = False
-
-    # 添加页面关闭检测逻辑（在game_page()函数内）
-    st.components.v1.html("""
-    <script>
-    window.addEventListener('beforeunload', function(e) {
-        fetch('/_stcore/_close_session', { method: 'POST' });
-    });
-    </script>
-    """)
-
+    
     st.set_page_config(page_title="狼人杀😋", page_icon="🐺", layout="wide", initial_sidebar_state="collapsed", menu_items={"About":"https://github.com/xxh16384/LLMsWerewolves"})
+
     st.title("🎭 狼人杀！")
     game = st.session_state.game
 
@@ -573,11 +556,13 @@ def game_page():
                     if st.session_state.phase_progress:
                         st.session_state.phase_progress.put("STOP")
                     # 等待线程结束
-                    st.session_state.phase_thread.join(timeout=2)
+                    with st.spinner("正在终止线程..."):
+                        st.session_state.phase_thread.join(timeout=5)
                     # 强制清除
-                    if st.session_state.phase_thread.is_alive():
-                        st.session_state.phase_thread = None
-                        st.rerun()
+                    with st.spinner("强制终止线程..."):
+                        if st.session_state.phase_thread.is_alive():
+                            time.sleep(1)
+                            st.session_state.phase_thread = None
 
             # 重置游戏状态
             st.session_state.current_page = 'config'
@@ -591,6 +576,9 @@ def game_page():
 
         # 创建选项卡布局
         tab1, tab2 = st.tabs(["💬 聊天日志", "👥 玩家状态"])
+
+        with tab2:  # 玩家状态选项卡
+            st.empty()
 
         with tab1:  # 聊天日志选项卡
             days, phase = game.get_game_stage()
@@ -615,6 +603,8 @@ def game_page():
                 st.components.v1.html("""<script>
                 window.location.hash = "存活玩家状态";
                 </script>""", height=0)
+                with tab2:  # 玩家状态选项卡
+                    st.empty()
                 with tab2:
                     days, phase = game.get_game_stage()
                     st.info(f"当前阶段：第{days}天 {'☀️ 白天' if phase else '🌙 夜晚'}")
@@ -628,9 +618,10 @@ def game_page():
                                 <p>{ROLE_ICONS.get(player.role,"❓")}</p>
                                 <p>{'✅ 存活' if player.alive else '❌ 出局'}</p>
                             </div>""", unsafe_allow_html=True)
+            # update_logs()
 
             # 阶段控制按钮
-            if st.button("⏭️ 进入下一阶段"):
+            if game.game_over() or st.button("⏭️ 进入下一阶段"):
                 with st.spinner("处理阶段..."), st.session_state.game_lock:
                     if st.session_state.phase_thread and st.session_state.phase_thread.is_alive():
                         if st.session_state.phase_progress:
@@ -644,11 +635,12 @@ def game_page():
                         try:
                             while not progress_queue.empty():
                                 msg = progress_queue.get()
-                                if msg == "STOP":
+                                if msg == "STOP" or game.game_over() or msg == "skip":
                                     return
-                            
+                            if (not progress_queue.empty() and progress_queue.get() == "STOP") or game.game_over():
+                                return
                             game.day_night_change()
-                            if not progress_queue.empty() and progress_queue.get() == "STOP":
+                            if (not progress_queue.empty() and progress_queue.get() == "STOP") or game.game_over():
                                 return
 
                             days, phase = game.get_game_stage()
@@ -678,38 +670,35 @@ def game_page():
                                 progress_queue.get()  # 清理队列
                             progress_queue.put("done")
 
-                        st.session_state.phase_thread = Thread(target=run_phase, args=(phase_progress,),daemon=True)
-                        st.session_state.phase_thread.start()
+                    st.session_state.phase_thread = Thread(target=run_phase, args=(phase_progress,),daemon=True)
+                    st.session_state.phase_thread.start()
 
             def monitor_phase(progress_queue):
-                start_time = time.time()
-                while time.time() - start_time < 60:
-                    with st.session_state.game_lock:
-                        update_logs()
-
+                while st.session_state.phase_thread.is_alive():
+                    update_logs()
                     time.sleep(2)
                     st.rerun()
-
                     try:
                         if progress_queue.get_nowait() == "done":
                             break
                     except:
                         continue
+                update_logs()
+                st.rerun()
 
             if st.session_state.phase_thread and st.session_state.phase_thread.is_alive():
                 with st.spinner("响应中..."):
                     if st.session_state.phase_progress:
                         monitor_phase(st.session_state.phase_progress)
-                
-                if game.game_over():
-                    st.balloons()
-                    st.success("游戏结束！")
-                    st.stop()
-            else:
-                update_logs()
 
-        with tab2:  # 玩家状态选项卡
-            st.empty()
+
+            if game.game_over():
+                st.balloons()
+                game.get_winner()
+                st.success("游戏结束！")
+                update_logs()
+                st.stop()
+
         if 'alert_message' in st.session_state:
             st.components.v1.html(f"""
             <script>
@@ -733,8 +722,8 @@ def main():
         else:
             st.warning("游戏初始化失败，请返回配置页面")
     finally:
-        # 全局清理逻辑
-        if 'phase_thread' in st.session_state:
+        # 修复后的全局清理逻辑
+        if 'phase_thread' in st.session_state and st.session_state.phase_thread is not None:
             if st.session_state.phase_thread.is_alive():
                 st.session_state.phase_progress.put("STOP")
                 st.session_state.phase_thread.join(timeout=1)

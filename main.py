@@ -696,13 +696,20 @@ class Game:
         """
 
         if len(self.get_players(alive=True)) - 2*len(self.get_players(alive=True,role="werewolf")) < 0: # 好人数量小于狼人数量
-            Context(self,0,f"游戏结束，狼人获胜",self.get_players(t="id",alive=False))
             return 1
         elif len(self.get_players(alive=True,role="werewolf")) == 0:
-            Context(self,0,f"游戏结束，好人获胜",self.get_players(t="id",alive=False))
             return 1
         else:
             return 0
+        
+    def get_winner(self) -> str:
+        if self.game_over():
+            if len(self.get_players(alive=True)) - 2*len(self.get_players(alive=True,role="werewolf")) < 0:
+                Context(self,0,f"游戏结束，狼人获胜",self.get_players(t="id",alive=False))
+                return "狼人"
+            elif len(self.get_players(alive=True,role="werewolf")) == 0:
+                Context(self,0,f"游戏结束，好人获胜",self.get_players(t="id",alive=False))
+                return "好人"
 
     def private_chat(self,player_id:int,content:str):
         """
@@ -827,6 +834,7 @@ if __name__ == "__main__":
         game.witch_operation()
         game.day_night_change()
         if game.game_over():
+            game.get_winner()
             break
         game.public_discussion()
         result = find_max_key(game.vote())
