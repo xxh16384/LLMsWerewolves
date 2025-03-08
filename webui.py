@@ -39,8 +39,6 @@ def init_session_state():
         st.session_state.game = None
     if 'initialized' not in st.session_state:
         st.session_state.initialized = False
-    if 'log_cache' not in st.session_state:
-        st.session_state.log_cache = []
     if 'game_lock' not in st.session_state:
         st.session_state.game_lock = Lock()
     if 'phase_thread' not in st.session_state:
@@ -53,6 +51,10 @@ def init_session_state():
         st.session_state.players = []
     if 'player_num' not in st.session_state:
         st.session_state.player_num = 8
+    if 'msg_progress' not in st.session_state:
+        st.session_state.msg_progress = None
+    if 'msg_queue' not in st.session_state:
+        st.session_state.msg_queue = Queue()
     if 'instructions' not in st.session_state:
         try:
             st.session_state.instructions = read_json("./config/default_instructions.json")
@@ -74,10 +76,13 @@ def config_page():
         st.title("🎮 快速配置")
         st.divider()
         st.markdown("""
-        **游戏规则提示**  
-        ▸ 最少需要4名玩家  
-        ▸ 需要至少1个狼人角色  
-        ▸ 每个玩家必须分配模型  
+        **游戏规则提示**
+
+        ▸ 最少需要4名玩家
+
+        ▸ 需要至少1个狼人角色
+
+        ▸ 每个玩家必须分配模型
         """)
         st.divider()
         game_name = st.text_input("输入游戏名称", "狼人杀游戏1")
@@ -113,11 +118,11 @@ def config_page():
                         if files["player_info"]:
                             players_config = json.load(files["player_info"])
                             new_players = []
-                            
+
                             # 提取数字键并排序
                             player_keys = [k for k in players_config.keys() if k.isdigit()]
                             player_keys = sorted(player_keys, key=lambda x: int(x))
-                            
+
                             # 遍历排序后的玩家键
                             for key in player_keys:
                                 player_data = players_config[key]
@@ -126,7 +131,7 @@ def config_page():
                                         "role": player_data.get("role", "villager"),
                                         "model": player_data.get("model", "")
                                     })
-                            
+
                             # 验证玩家数量
                             if len(new_players) < 4:
                                 st.error("玩家数量不能少于4个")
@@ -140,7 +145,7 @@ def config_page():
                                 st.session_state.instructions = json.load(files["instructions"])
                             except Exception as e:
                                 st.error(f"提示词解析失败: {str(e)}")
-                        
+
                         st.success("配置已加载到当前表单！")
                         success_msg = "成功加载了"
                         if files["apis"]: success_msg += " API配置"
@@ -152,12 +157,12 @@ def config_page():
                         st.session_state.current_step = 3  # 跳转到最后一步
                         st.rerun()
 
-                        
+
                     except json.JSONDecodeError:
                         st.error("配置文件格式错误，请检查JSON格式")
                     except Exception as e:
                         st.error(f"配置加载失败: {str(e)}")
-            
+
             with load_cols[1]:
                 if st.button("🔄 重置表单", help="清空所有配置", type="secondary", use_container_width=True):
                     st.session_state.models = []
@@ -181,7 +186,7 @@ def config_page():
             )
             # 新增导入配置上传器
             imported_config = st.file_uploader("上传备份配置", type=["json"], key="import_config")
-            
+
             if imported_config and st.button("导入配置", use_container_width=True):
                 try:
                     config_data = json.load(imported_config)
@@ -202,10 +207,10 @@ def config_page():
                             st.session_state.player_num = len(config_data["players"])
                         else:
                             st.error("玩家数量不足4人")
-                        
+
                         # 覆盖提示词
                         st.session_state.instructions.update(config_data["instructions"])
-                        
+
                         st.success("配置导入成功！")
                         file_name = imported_config.name.split('.')[0][:20]  # 截取文件名前20字符
                         st.session_state.alert_message = f"成功导入了备份配置：{file_name}"  # 设置弹窗消息
@@ -323,7 +328,7 @@ def config_page():
                 with cols[i%4]:
                     with st.container(border=True):
                         st.markdown(f"### 玩家 {i+1}")
-                        
+
                         # 角色选择
                         current_role = st.session_state.players[i]["role"]
                         new_role = st.selectbox(
@@ -354,7 +359,7 @@ def config_page():
     elif current_step == steps[2]:
         with st.container(border=True):
             st.subheader("📝 提示词设置")
-            
+
             # 角色名称映射
             role_names = {
                 "werewolf": "🐺 狼人",
@@ -362,7 +367,7 @@ def config_page():
                 "witch": "🧙♀ 女巫",
                 "seer": "🔮 预言家"
             }
-            
+
             # 通用提示词设置
             st.session_state.instructions["general"] = st.text_area(
                 "通用提示词",
@@ -371,7 +376,7 @@ def config_page():
                 help="使用Markdown格式编写，支持代码块等格式",
                 key="general_inst"
             )
-            
+
             cols = st.columns(2)
             with cols[0]:
                 if st.button("恢复默认提示词",key="reset_general"):
@@ -381,7 +386,7 @@ def config_page():
                 if st.button("清空提示词",key="clear_general"):
                     st.session_state.instructions["general"] = ""
                     st.rerun()
-            
+
             # 分角色提示词设置
             role_tabs = st.tabs(["🐺 狼人", "👨🌾 村民", "🧙♀ 女巫", "🔮 预言家"])
             for idx, tab in enumerate(role_tabs):
@@ -408,7 +413,7 @@ def config_page():
         with st.container(border=True):
             st.subheader("✅ 配置完成")
             st.text_input("游戏名称", value=game_name, key="game_name")
-            
+
             # 配置预览
             with st.expander("📋 当前配置概览"):
                 config_preview = {
@@ -426,15 +431,15 @@ def config_page():
                     }
                 }
                 st.json(config_preview)
-            
+
             # 配置验证
             valid = True
             validation_errors = []
-            
+
             if not st.session_state.models:
                 validation_errors.append("至少需要配置一个模型")
                 valid = False
-                
+
             for i, player in enumerate(st.session_state.players):
                 if not player["model"]:
                     validation_errors.append(f"玩家 {i+1} 未选择模型")
@@ -442,12 +447,14 @@ def config_page():
                 if player["model"] not in [m["name"] for m in st.session_state.models]:
                     validation_errors.append(f"玩家 {i+1} 使用的模型不存在")
                     valid = False
-            
+
             # 显示验证结果
             if validation_errors:
                 st.error("配置存在问题：\n- " + "\n- ".join(validation_errors))
             else:
                 st.success("所有配置验证通过！")
+
+            game_mode = st.selectbox("选择游戏模式", ["全自动模式", "人工模式（你是上帝❗）"], key="webui_mode",index = 0)
 
             # 游戏启动按钮
             if valid and st.button("🚀 启动游戏", type="primary", use_container_width=True):
@@ -478,10 +485,10 @@ def config_page():
                         webui_mode=True,
                         from_dict=True
                     )
-                    
+
                     # 保存游戏状态
                     st.session_state.game = game
-                    st.session_state.current_page = 'game'
+                    st.session_state.current_page = 'auto_game' if game_mode == "全自动模式" else 'manual_game'
                     st.session_state.initialized = True
                     st.rerun()
     if 'alert_message' in st.session_state:
@@ -532,7 +539,7 @@ def format_log_message(context, game):
 </div>"""
 
 
-def game_page():
+def auto_game_page():
 
     st.set_page_config(page_title="狼人杀😋", page_icon="🐺", layout="wide", initial_sidebar_state="collapsed", menu_items={"About":"https://github.com/xxh16384/LLMsWerewolves"})
 
@@ -561,7 +568,6 @@ def game_page():
             st.session_state.current_page = 'config'
             st.session_state.game = None
             st.session_state.initialized = False
-            st.session_state.log_cache = []
             st.rerun()
 
     if st.session_state.game and st.session_state.initialized:
@@ -577,14 +583,14 @@ def game_page():
             days, phase = game.get_game_stage()
             st.info(f"当前阶段：第{days}天 {'☀️ 白天' if phase else '🌙 夜晚'}")
 
+            stages = [f"第{i//2+1}天{'☀️ 白天' if (i+1)%2 else '🌙 夜晚'}" for i in range(game.stage+1)]
+            display_stage = st.selectbox("聊天记录展示阶段", stages, key="display_stage", index=len(stages)-1)
             # 日志容器
             log_container = st.empty()
 
             def update_logs():
-                current_logs = Context.contexts.get(game, [])
-                new_logs = current_logs[len(st.session_state.log_cache):]
-
-                formatted_logs = "".join([str(format_log_message(c, game)) for c in st.session_state.log_cache + new_logs])
+                current_logs = Context.get_chat_log(game, stages.index(display_stage)) if Context.get_chat_log(game, stages.index(display_stage)) else []
+                formatted_logs = "".join([str(format_log_message(c, game)) for c in current_logs])
 
                 log_container.markdown(f"""
                 <div id="log-container" style="overflow-y: auto;max-height: 60vh;">
@@ -592,7 +598,6 @@ def game_page():
                 </div>
                 """, unsafe_allow_html=True)
 
-                st.session_state.log_cache = current_logs.copy()
                 st.components.v1.html("""<script>
                 window.location.hash = "存活玩家状态";
                 </script>""", height=0)
@@ -724,14 +729,210 @@ def game_page():
         st.info("请先创建游戏")
 
 
+def manual_game_page():
+    st.set_page_config(page_title="狼人杀😋", page_icon="🐺", layout="wide", initial_sidebar_state="expanded", menu_items={"About":"https://github.com/xxh16384/LLMsWerewolves"})
+
+    st.title("🎭 狼人杀！")
+    game = st.session_state.game
+
+    # 侧边栏显示控制按钮
+    with st.sidebar:
+        if st.button("↩️ 返回配置"):
+            # 安全终止线程的逻辑（与auto_game_page保持一致）
+            if hasattr(st.session_state, 'msg_thread') and st.session_state.msg_thread:
+                if st.session_state.msg_thread.is_alive():
+                    if st.session_state.msg_progress:
+                        st.session_state.msg_progress.set()
+                    with st.spinner("正在终止线程..."):
+                        st.session_state.msg_thread.join(timeout=10)
+                    with st.spinner("强制终止线程..."):
+                        if st.session_state.msg_thread.is_alive():
+                            time.sleep(1)
+                            st.session_state.msg_thread = None
+
+            st.session_state.current_page = 'config'
+            st.session_state.game = None
+            st.session_state.initialized = False
+            st.rerun()
+
+        st.divider()
+        st.title("📕✍ 人工操作")
+
+        with st.expander("💬 对话操作", expanded=True):
+            if st.session_state.game:
+                selected_action = st.selectbox("选择操作",options=["上帝广播","私聊","公共聊天","群发公共聊天"],key="selected_action", index=0)
+
+                player_options = [f"{player.id}号{player_role_to_chinese[player.role]}" for player in st.session_state.game.get_players(t="object")] + ["全体存活玩家","全体玩家"]
+
+                match selected_action:
+                    case "上帝广播":
+                        default_options = len(player_options)-1
+                    case "私聊"|"公共聊天":
+                        default_options = 0
+                    case "群发公共聊天":
+                        default_options = len(player_options)-2
+
+                selected_player = st.selectbox("选择玩家", options=player_options,key="selected_player", index=default_options)
+                selected_player_id = player_options.index(selected_player)
+                content = st.text_area("请输入内容", key="content")
+
+                if st.button("发送", disabled= not st.session_state.msg_progress.is_set() if st.session_state.msg_progress else False):
+                    msg_progress = Event()
+                    st.session_state.msg_progress = msg_progress
+
+                    def send_message():
+                        try:
+                            match selected_action:
+                                case "上帝广播":
+                                    if selected_player_id != len(player_options)-1:
+                                        raise ValueError("上帝广播仅支持全体玩家")
+                                    game.broadcast(content)
+                                case "私聊":
+                                    if selected_player_id == len(player_options)-1 or selected_player_id == len(player_options)-2:
+                                        raise ValueError("私聊仅支持单个玩家")
+                                    target_id = game.get_players(t="object")[selected_player_id].id
+                                    game.private_chat(target_id, content)
+                                case "公共聊天":
+                                    if selected_player_id == len(player_options)-1 or selected_player_id == len(player_options)-2:
+                                        raise ValueError("公共聊天仅支持单个玩家")
+                                    target_id = game.get_players(t="object")[selected_player_id].id
+                                    game.public_chat(target_id, content)
+                                case "群发公共聊天":
+                                    if selected_player_id != len(player_options)-2:
+                                        raise ValueError("群发公共聊天仅支持全体存活玩家")
+                                    Context(game,0,content,visible_ids=game.get_players(t="id",alive=False))
+                                    for player in game.get_players(alive=(selected_player == "全体存活玩家")):
+                                        game.public_chat(player.id, content,False)
+                        except Exception as e:
+                            st.session_state.msg_queue.put(("error", f"发送失败: {str(e)}"))
+                        finally:
+                            msg_progress.set()
+                            st.session_state.msg_queue.put(("status", False))
+
+                    st.session_state.msg_thread = Thread(target=send_message, daemon=True)
+                    from streamlit.runtime.scriptrunner import add_script_run_ctx
+                    add_script_run_ctx(st.session_state.msg_thread)
+                    st.session_state.msg_thread.start()
+
+                if st.session_state.msg_queue and not st.session_state.msg_queue.empty():
+                    msg_type, content = st.session_state.msg_queue.get()
+                    if msg_type == "error":
+                        st.error(content)
+                        time.sleep(1)
+                    st.rerun()
+
+        with st.expander("☀️🌙游戏阶段更替", expanded=True):
+            if st.session_state.game:
+                generate_broadcast = st.radio("是自动否生成广播", options=["是", "否"], key="generate_broadcast", index=0)
+                if st.button("更替", disabled= not st.session_state.msg_progress.is_set() if st.session_state.msg_progress else False):
+                    game.stage += 1
+                    days,morning_dusk = game.get_game_stage()
+                    if generate_broadcast == "是":
+                        game.broadcast(f"现在是第{days}天{'白天' if morning_dusk else '晚上'}")
+
+        with st.expander("👥 玩家管理", expanded=True):
+            players_out = st.text_input("请输入玩家编号，用英文逗号分隔", key="player_name",value="")
+            try:
+                if st.button("踢出玩家", disabled= not st.session_state.msg_progress.is_set() if st.session_state.msg_progress else False):
+                    players_out_id = [int(player_id) for player_id in players_out.split(",")]
+                    game.out(players_out_id)
+                    st.success(f"踢出成功，已踢出{str(players_out_id)[1:-1]}号玩家")
+                    st.rerun()
+            except Exception as e:
+                st.error(f"踢出失败: {str(e)}")
+
+    # 主界面布局
+    if st.session_state.game and st.session_state.initialized:
+        tab1, tab2 = st.tabs(["💬 聊天日志", "👥 玩家状态"])
+        
+        with tab2:
+            st.empty()
+
+        with tab1:  # 聊天日志
+            days, phase = game.get_game_stage()
+            st.info(f"当前阶段：第{days}天 {'☀️ 白天' if phase else '🌙 夜晚'}")
+            stages = [f"第{i//2+1}天{'☀️ 白天' if (i+1)%2 else '🌙 夜晚'}" for i in range(game.stage+1)]
+            display_stage = st.selectbox("聊天记录展示阶段", stages, key="display_stage", index=len(stages)-1)
+            log_container = st.empty()
+
+            def update_logs():
+        
+                current_logs = Context.get_chat_log(game, stages.index(display_stage)) if Context.get_chat_log(game, stages.index(display_stage)) else []
+                formatted_logs = "".join([str(format_log_message(c, game)) for c in current_logs])
+
+                log_container.markdown(f"""
+                <div id="log-container" style="overflow-y: auto; max-height: 70vh;">
+                    {formatted_logs}
+                </div>
+                """, unsafe_allow_html=True)
+
+                # 自动滚动到底部
+                st.components.v1.html("""
+                <script>
+                    var logContainer = document.getElementById('log-container');
+                    logContainer.scrollTop = logContainer.scrollHeight;
+                </script>
+                """)
+                with tab2:  # 玩家状态
+                    days, phase = game.get_game_stage()
+                    st.info(f"当前阶段：第{days}天 {'☀️ 白天' if phase else '🌙 夜晚'}")
+
+                    players = game.get_players(alive=False)
+                    cols = st.columns(3)
+                    for i, player in enumerate(players):
+                        with cols[i % 3]:
+                            role_color = ROLE_COLORS.get(player.role, "#FFF")
+                            st.markdown(f"""<div style='text-align: center; padding: 12px; border-radius: 12px;background-color: {role_color};'>
+                                <h4>玩家{player.id}</h4>
+                                <p>{ROLE_ICONS.get(player.role,"❓")}</p>
+                                <p>{'✅ 存活' if player.alive else '❌ 出局'}</p>
+                            </div>""", unsafe_allow_html=True)
+
+
+            update_logs()
+
+        # 消息发送监控线程
+        def monitor_message(progress_event):
+            while not progress_event.is_set():
+                time.sleep(0.5)
+                if progress_event.is_set():
+                    st.session_state.msg_thread = None
+                    st.session_state.msg_progress = None
+                    st.rerun()
+                st.rerun()
+
+        if st.session_state.get('msg_thread') and st.session_state.msg_thread.is_alive():
+            with st.spinner("消息发送中..."):
+                monitor_message(st.session_state.msg_progress)
+
+        # 游戏结束处理
+        if game.game_over():
+            st.balloons()
+            winner = game.get_winner()
+            st.success(f"游戏结束！胜利方：{winner}")
+            st.stop()
+    else:
+        st.info("请先创建游戏")
+
+    if 'alert_message' in st.session_state:
+        st.components.v1.html(f"""
+        <script>
+            alert("{st.session_state.alert_message}");
+        </script>
+        """)
+        del st.session_state.alert_message
+
+
 def main():
     init_session_state()
 
     try:
         if st.session_state.current_page == 'config':
             config_page()
-        elif st.session_state.current_page == 'game' and st.session_state.game:
-            game_page()
+        elif st.session_state.current_page == 'auto_game' and st.session_state.game:
+            auto_game_page()
+        elif st.session_state.current_page == 'manual_game' and st.session_state.game:
+            manual_game_page()
         else:
             st.warning("游戏初始化失败，请返回配置页面")
     finally:

@@ -96,6 +96,7 @@ class Context:
                 Context.contexts[game].pop(-1)
         Context.contexts[game].append(self)
         self.game = game
+        self.stage = game.stage
         self.is_streaming = is_streaming
         self.last_block = last_block
         self.source_id = source_id
@@ -125,6 +126,25 @@ class Context:
             if id in i.visible_ids: #自己可见的
                 pub_messages.append(re.sub(r'<think>.*?</think>', '', str(i), flags=re.DOTALL))
         return pub_messages
+    
+    def get_chat_log(game, stage):
+        """
+        根据游戏id和阶段，返回该阶段所有信息
+
+        Args:
+            game (int/str): 游戏唯一标识符，用于从上下文中获取对应游戏的记录
+            stage (int/str): 需要过滤的特定阶段标识符
+
+        Returns:
+            list: 包含所有符合条件消息对象的列表，若无匹配项则返回空列表
+        """
+        messages = []
+        # 遍历指定游戏的全部上下文记录
+        for i in Context.contexts[game]:
+            # 筛选出阶段标识匹配的记录
+            if i.stage == stage:
+                messages.append(i)
+        return messages
 
     def __str__(self):
         v_id = self.visible_ids
@@ -173,25 +193,25 @@ class Player:
         Initializes the system prompt for a player based on their role and game context.
 
         This method constructs a pre-instruction message for the player, indicating their
-        role in the game and any relevant information specific to their role. If the player's 
+        role in the game and any relevant information specific to their role. If the player's
         role is 'werewolf', additional information about other werewolf players is included.
 
         The constructed message is appended to the player's message list as a system message.
 
         Side Effects:
-            Updates the player's message list with a new system message containing the 
+            Updates the player's message list with a new system message containing the
             role-specific instructions and information.
 
         Attributes:
             pre_instruction (str): The instruction message constructed for the player.
-            wolfs (list): A list of non-alive werewolf players, used to provide additional 
+            wolfs (list): A list of non-alive werewolf players, used to provide additional
                         information for players with the 'werewolf' role.
         """
 
         pre_instruction = f"你是{self.id}号玩家，" + self.game.instructions[self.role]
         if self.role == "werewolf":
             wolfs = self.game.get_players("id",alive=False,role="werewolf")
-            pre_instruction += f"\n以下玩家是狼人{wolfs}，是你和你的队友"
+            pre_instruction += f"\n以下玩家是狼人{str(wolfs)[1:-1]}，是你和你的队友"
         self.messages.append({"role":"system","content":pre_instruction})
 
     def get_response(self,prompt,if_pub):
@@ -216,6 +236,7 @@ class Player:
         Side Effects:
             The player's response is appended to the game's context as a new message.
         """
+        visible_ids = self.game.get_players("id",alive=False) if if_pub else [self.id,0] + self.game.get_players("id",role=self.role)
         pub_messages = Context.get_context(self.id,self.game)
         prompt0 = prompt
         if if_pub:
@@ -233,12 +254,14 @@ class Player:
         # 处理回复
         if not self.game.webui_mode:
             collected_messages = ""
+            reasoning_messages = ""
             reasoning_model = -1 # 判断是否是推理模型，-1待判断，0不是，1是
             print(f"玩家{self.id}（{self.role}）： ", end="", flush=True)
             for chunk in response:
                 if reasoning_model == -1:
                     try:
                         reasoning_message = chunk.choices[0].delta.reasoning_content
+                        reasoning_messages += reasoning_message
                         reasoning_model = 1
                         reasoning = True
                         print("思考中...\n", end="", flush=True)
@@ -249,6 +272,7 @@ class Player:
                     reasoning_message = chunk.choices[0].delta.reasoning_content
                     chunk_message = chunk.choices[0].delta.content
                     if reasoning_message and reasoning:
+                        reasoning_messages += reasoning_message
                         print(reasoning_message, end="", flush=True)
                     elif not reasoning_message and reasoning and chunk_message:
                         print("\n思考结束...\n")
@@ -265,12 +289,10 @@ class Player:
 
             print("")
             # 加入公共上下文
-            visible_ids = self.game.get_players("id",alive=False) if if_pub else [self.id,0] + self.game.get_players("id",role=self.role)
+            collected_messages = "<think>"+reasoning_messages+"</think>" + collected_messages if reasoning_messages else collected_messages
             Context(self.game,self.id,collected_messages,visible_ids)
-
         else:
             collected_messages = ""
-            visible_ids = self.game.get_players("id",alive=False) if if_pub else [self.id,0] + self.game.get_players("id",role=self.role)
             c = lambda content,last_block=False:Context(self.game, self.id,content,visible_ids=visible_ids,is_streaming=True,last_block=last_block)
             for chunk in response:
                 chunk_content = chunk.choices[0].delta.content or ""
@@ -282,6 +304,7 @@ class Player:
                             reasoning_message = chunk.choices[0].delta.reasoning_content
                             reasoning_model = 1
                             reasoning = True
+                            collected_messages += "<think>\n" + reasoning_message
                             c("<think>\n")
                             c(reasoning_message)
                         except:
@@ -294,10 +317,11 @@ class Player:
                         chunk_message = chunk.choices[0].delta.content
                         if reasoning_message and reasoning:
                             c(reasoning_message)
+                            collected_messages += reasoning_message
                         elif not reasoning_message and reasoning and chunk_message:
                             c("\n</think>\n")
                             reasoning = False
-                            collected_messages += chunk_message
+                            collected_messages += "\n</think>\n" + chunk_message
                             c(chunk_message)
                         elif not reasoning:
                             collected_messages += chunk_message
@@ -383,6 +407,7 @@ class Game:
             kill_tonight (list): the players to be killed tonight
         """
         self.game_name = game_name
+        self.stage = 0
         self.id = time.time()
         self.set_logger()
 
@@ -400,7 +425,6 @@ class Game:
             self.players_info = read_json(players_info_path)
         self.players = []
         self.init_game()
-        self.stage = 0
         self.kill_tonight = []
         self.webui_mode = webui_mode
 
@@ -702,7 +726,7 @@ class Game:
             return 1
         else:
             return 0
-        
+
     def get_winner(self) -> str:
         if self.game_over():
             if len(self.get_players(alive=True)) - 2*len(self.get_players(alive=True,role="werewolf")) < 0:
@@ -722,7 +746,7 @@ class Game:
         """
         self.get_players_by_ids([player_id])[0].private_chat(0,content)
 
-    def public_chat(self,player_id:int,content:str):
+    def public_chat(self,player_id:int,content:str,add_to_context:bool=True):
         """
         Allows a player to send a public chat message.
 
@@ -731,7 +755,7 @@ class Game:
             content (str): The content of the chat message to be sent.
         """
 
-        self.get_players_by_ids([player_id])[0].pub_chat(0,content)
+        self.get_players_by_ids([player_id])[0].pub_chat(0,content,add_to_context)
 
     def broadcast(self,content):
         """
@@ -757,10 +781,7 @@ class Game:
         players_pending = self.get_players_by_ids(player_ids)
         for i in players_pending:
             i.alive = False
-        self.broadcast(f"{player_ids}号玩家出局")
-
-    def manual_operation(self,operate:str):
-        pass
+        self.broadcast(f"{str(player_ids)[1:-1]}号玩家出局")
 
     def day_night_change(self):
         """
@@ -778,7 +799,8 @@ class Game:
         self.broadcast(f"现在是第{days}天{'白天' if morning_dusk else '晚上'}")
         if morning_dusk == 1 and days > 1:
             if self.kill_tonight:
-                self.broadcast(f"昨晚{self.kill_tonight}号玩家被杀了")
+                self.kill_tonight = list(set(self.kill_tonight))
+                self.broadcast(f"昨晚{str(self.kill_tonight)[1:-1]}号玩家被杀了")
                 self.out(self.kill_tonight)
                 self.kill_tonight = []
             else:
