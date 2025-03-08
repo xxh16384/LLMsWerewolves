@@ -531,7 +531,7 @@ def format_log_message(context, game):
 
 
 def game_page():
-    
+
     st.set_page_config(page_title="狼人杀😋", page_icon="🐺", layout="wide", initial_sidebar_state="collapsed", menu_items={"About":"https://github.com/xxh16384/LLMsWerewolves"})
 
     st.title("🎭 狼人杀！")
@@ -618,12 +618,15 @@ def game_page():
             
             # 阶段控制按钮
             if not game.game_over():
-                btn = st.button("⏭️ 进入下一阶段", 
-                            disabled=game.game_over(),
-                            help="游戏已结束" if game.game_over() else "进入下一阶段")
+                btn = st.button("⏭️ 进入下一阶段",
+                                disabled=game.game_over() or (st.session_state.phase_thread and st.session_state.phase_thread.is_alive()),
+                                help="游戏已结束" if game.game_over() else "进入下一阶段")
             else:
                 btn = False
             if btn:
+                if st.session_state.phase_thread and st.session_state.phase_thread.is_alive():
+                    st.warning("当前阶段正在处理中，请稍候...")
+                    return
                 with st.spinner("处理阶段..."), st.session_state.game_lock:
                     # 二次验证游戏状态（防止点击瞬间状态变化）
                     if game.game_over():
@@ -682,6 +685,8 @@ def game_page():
                     # 双重终止条件 + 游戏状态检查
                     if progress_event.is_set() or game.game_over():
                         progress_event.set()  # 确保传播终止信号
+                        st.session_state.phase_thread = None
+                        st.session_state.phase_progress = None
                         break
                     
                     with st.session_state.game_lock:
@@ -716,11 +721,11 @@ def game_page():
 
     else:
         st.info("请先创建游戏")
-        
+
 
 def main():
     init_session_state()
-    
+
     try:
         if st.session_state.current_page == 'config':
             config_page()
