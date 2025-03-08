@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import time
+import re
 
 # 工具函数
 def read_json(file_path):
@@ -122,7 +123,7 @@ class Context:
         pub_messages = []
         for i in Context.contexts[game]:
             if id in i.visible_ids: #自己可见的
-                pub_messages.append(str(i))
+                pub_messages.append(re.sub(r'<think>.*?</think>', '', str(i), flags=re.DOTALL))
         return pub_messages
 
     def __str__(self):

@@ -51,6 +51,8 @@ def init_session_state():
         st.session_state.models = []
     if 'players' not in st.session_state:
         st.session_state.players = []
+    if 'player_num' not in st.session_state:
+        st.session_state.player_num = 8
     if 'instructions' not in st.session_state:
         try:
             st.session_state.instructions = read_json("./config/default_instructions.json")
@@ -291,7 +293,7 @@ def config_page():
             num_players = st.number_input("玩家数量",
                                         min_value=4,
                                         max_value=18,
-                                        value=len(st.session_state.players) if st.session_state.players else 8,
+                                        value=st.session_state.player_num if st.session_state.player_num else 8,
                                         step=1,
                                         key="player_num_control")
 
@@ -459,10 +461,10 @@ def config_page():
                         },
                         "instructions": st.session_state.instructions
                     }
-                    config["players_info"]["0"] = f"这是一局有{len(st.session_state.players)}名玩家的狼人杀游戏，其中有"
+                    config["players_info"]["0"] = f"这是一局有{st.session_state.player_num}名玩家的狼人杀游戏，其中有"
                     players_count = {}
                     for i in st.session_state.players:
-                        players_count[player_role_to_chinese[i["role"]]] = players_count.get(i["role"], 0) + 1
+                        players_count[player_role_to_chinese[i["role"]]] = players_count.get(player_role_to_chinese[i["role"]], 0) + 1
                     for i in players_count:
                         config["players_info"]["0"] += f"{players_count[i]}名{i}，"
                     config["players_info"]["0"] = config["players_info"]["0"][:-1] + "。"
@@ -615,63 +617,70 @@ def game_page():
                 update_logs()
                 st.stop()
                 st.rerun()
-            
+
             # 阶段控制按钮
             if not game.game_over():
+                btn_disabled = bool(
+                    (game and game.game_over())
+                    or (st.session_state.phase_thread and st.session_state.phase_thread.is_alive())
+                )
                 btn = st.button("⏭️ 进入下一阶段",
-                                disabled=game.game_over() or (st.session_state.phase_thread and st.session_state.phase_thread.is_alive()),
-                                help="游戏已结束" if game.game_over() else "进入下一阶段")
+                                disabled=btn_disabled,
+                                help="游戏已结束" if (game and game.game_over()) else "进入下一阶段")
             else:
                 btn = False
+
+            # 无论是否点击按钮都执行update_logs
+            update_logs()  # 新增此行保证日志持续更新
+
             if btn:
+                btn = False
+                btn_disabled = False
                 if st.session_state.phase_thread and st.session_state.phase_thread.is_alive():
                     st.warning("当前阶段正在处理中，请稍候...")
+                    st.rerun()
                     return
-                with st.spinner("处理阶段..."), st.session_state.game_lock:
-                    # 二次验证游戏状态（防止点击瞬间状态变化）
-                    if game.game_over():
-                        st.rerun()
-                        return
-                    
-                    phase_progress = Event()
-                    st.session_state.phase_progress = phase_progress
+                else:
+                    with st.spinner("处理阶段..."), st.session_state.game_lock:
+                        # 二次验证游戏状态（防止点击瞬间状态变化）
+                        if game.game_over():
+                            st.rerun()
+                            return
 
-                    def run_phase(progress_event):
-                        try:
-                            while not (progress_event.is_set() or game.game_over()):
+                        phase_progress = Event()
+                        st.session_state.phase_progress = phase_progress
+
+                        def run_phase(progress_event):
+                            try:
                                 # 每次循环前检查游戏状态
                                 if game.game_over():
                                     progress_event.set()
                                     return
-                                
-                                game.day_night_change()
+
+                                if not game.game_over() and not progress_event.is_set():game.day_night_change()
                                 days, phase = game.get_game_stage()
 
                                 if not phase:
                                     # 每个操作前检查状态
-                                    if not game.game_over(): game.werewolf_killing()
-                                    if not game.game_over(): game.seer_seeing()
-                                    if not game.game_over(): game.witch_operation()
+                                    if not game.game_over() and not progress_event.is_set(): game.werewolf_killing()
+                                    if not game.game_over() and not progress_event.is_set(): game.seer_seeing()
+                                    if not game.game_over() and not progress_event.is_set(): game.witch_operation()
                                 else:
-                                    if not game.game_over(): game.public_discussion()
-                                    if not game.game_over():
+                                    if not game.game_over() and not progress_event.is_set(): game.public_discussion()
+                                    if not game.game_over() and not progress_event.is_set():
                                         result = game.vote()
                                         game.out([find_max_key(result)])
-                                
-                                # 每次操作后立即检查
-                                if game.game_over():
-                                    progress_event.set()
-                                    return
 
-                        except Exception as e:
-                            st.error(f"阶段处理失败：{e}")
-                        finally:
-                            progress_event.set()
 
-                    # 启动线程前再次检查
-                    if not game.game_over():
-                        st.session_state.phase_thread = Thread(target=run_phase, args=(phase_progress,), daemon=True)
-                        st.session_state.phase_thread.start()
+                            except Exception as e:
+                                st.error(f"阶段处理失败：{e}")
+                            finally:
+                                progress_event.set()
+
+                        # 启动线程前再次检查
+                        if not game.game_over():
+                            st.session_state.phase_thread = Thread(target=run_phase, args=(phase_progress,), daemon=True)
+                            st.session_state.phase_thread.start()
             if game.game_over():
                 st.balloons()
                 game.get_winner()
@@ -688,13 +697,8 @@ def game_page():
                         st.session_state.phase_thread = None
                         st.session_state.phase_progress = None
                         break
-                    
-                    with st.session_state.game_lock:
-                        update_logs()
-                    
                     time.sleep(2)
                     st.rerun()
-                update_logs()
 
             if st.session_state.phase_thread and st.session_state.phase_thread.is_alive():
                 with st.spinner("响应中..."):
@@ -716,9 +720,6 @@ def game_page():
             </script>
             """)
             del st.session_state.alert_message
-            
-        update_logs()
-
     else:
         st.info("请先创建游戏")
 
