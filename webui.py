@@ -32,6 +32,8 @@ ROLE_ICONS = {
     "未知":"❓"
 }
 
+stander_roles = ["werewolf", "villager", "witch", "seer"]
+
 def init_session_state():
     if 'current_page' not in st.session_state:
         st.session_state.current_page = 'config'
@@ -319,7 +321,7 @@ def config_page():
                 st.session_state.player_num = num_players
 
             # 角色选项配置
-            roles = ["werewolf", "villager", "witch", "seer"]
+            roles_to_select = stander_roles + ["自定义"]
             role_names = {
                 "werewolf": "🐺 狼人",
                 "villager": "👨🌾 村民",
@@ -327,7 +329,6 @@ def config_page():
                 "seer": "🔮 预言家"
             }
 
-            # 生成玩家配置项
             cols = st.columns(4)
             for i in range(num_players):
                 with cols[i%4]:
@@ -335,14 +336,24 @@ def config_page():
                         st.markdown(f"### 玩家 {i+1}")
 
                         # 角色选择
-                        current_role = st.session_state.players[i]["role"]
+                        current_role = st.session_state.players[i]["role"] if st.session_state.players[i]["role"] else "villager"
                         new_role = st.selectbox(
                             "角色",
-                            options=roles,
-                            index=roles.index(current_role) if current_role in roles else 1,
-                            format_func=lambda x: role_names[x],
+                            options=roles_to_select,
+                            index=stander_roles.index(current_role) if current_role in stander_roles else len(roles_to_select)-1,
+                            format_func=lambda x: role_names.get(x,"❓"+x),
                             key=f"role_{i}"
                         )
+
+                        if new_role == "自定义":
+                            new_role = st.text_input("自定义角色名",
+                                                    key=f"custom_role_{i}",
+                                                    value=current_role)
+                            if new_role in stander_roles:
+                                st.error("自定义角色名不能与标准角色名重复")
+                                new_role = current_role
+                                st.session_state.instructions[new_role] = ""
+
 
                         # 模型选择
                         if st.session_state.models:
@@ -393,12 +404,13 @@ def config_page():
                     st.rerun()
 
             # 分角色提示词设置
-            role_tabs = st.tabs(["🐺 狼人", "👨🌾 村民", "🧙♀ 女巫", "🔮 预言家"])
+            all_roles = list(set([i["role"] for i in st.session_state.players]))
+            role_tabs = st.tabs([role_names.get(r,"❓"+r) for r in all_roles])
             for idx, tab in enumerate(role_tabs):
                 with tab:
-                    role = ["werewolf", "villager", "witch", "seer"][idx]
+                    role = all_roles[idx]
                     st.session_state.instructions[role] = st.text_area(
-                        f"{role_names[role]}提示词",
+                        f"{role_names.get(role,role)}提示词",
                         value=st.session_state.instructions.get(role, ""),
                         height=400,
                         key=f"edit_{role}"
@@ -406,7 +418,7 @@ def config_page():
                     cols = st.columns(2)
                     with cols[0]:
                         if st.button("恢复默认提示词",key=f"reset_{role}"):
-                            st.session_state.instructions[role] = read_json("./config/default_instructions.json")[role]
+                            st.session_state.instructions[role] = read_json("./config/default_instructions.json").get(role, "")
                             st.rerun()
                     with cols[1]:
                         if st.button("清空提示词",key=f"clear_{role}"):
@@ -462,13 +474,23 @@ def config_page():
                 validation_errors.append("至少需要一个狼人")
                 valid = False
 
+            has_custom_role = False
+            for i in st.session_state.players:
+                if i["role"] not in stander_roles:
+                    has_custom_role = True
+                    break
+
+            game_mode = st.selectbox("选择游戏模式", ["全自动模式", "人工模式（你是上帝❗）"], key="webui_mode",index = 1 if has_custom_role else 0)
+
+            if has_custom_role and game_mode != "人工模式（你是上帝❗）":
+                validation_errors.append("存在自定义角色时只能选择人工模式")
+                valid = False
             # 显示验证结果
             if validation_errors:
                 st.error("配置存在问题：\n- " + "\n- ".join(validation_errors))
             else:
                 st.success("所有配置验证通过！")
 
-            game_mode = st.selectbox("选择游戏模式", ["全自动模式", "人工模式（你是上帝❗）"], key="webui_mode",index = 0)
 
             # 游戏启动按钮
             if valid and st.button("🚀 启动游戏", type="primary", use_container_width=True):
@@ -485,7 +507,7 @@ def config_page():
                     config["players_info"]["0"] = f"这是一局有{st.session_state.player_num}名玩家的狼人杀游戏，其中有"
                     players_count = {}
                     for i in st.session_state.players:
-                        players_count[player_role_to_chinese[i["role"]]] = players_count.get(player_role_to_chinese[i["role"]], 0) + 1
+                        players_count[player_role_to_chinese.get(i["role"],i["role"])] = players_count.get(player_role_to_chinese.get(i["role"],i["role"]), 0) + 1
                     for i in players_count:
                         config["players_info"]["0"] += f"{players_count[i]}名{i}，"
                     config["players_info"]["0"] = config["players_info"]["0"][:-1] + "。"
@@ -625,7 +647,7 @@ def auto_game_page():
                             role_color = ROLE_COLORS.get(player.role, "#FFF")
                             st.markdown(f"""<div style='text-align: center; padding: 12px; border-radius: 12px; background-color: {role_color};'>
                                 <h4>玩家{player.id}</h4>
-                                <p>{ROLE_ICONS.get(player.role,"❓")}</p>
+                                <p>{ROLE_ICONS.get(player.role,"❓"+player.role)}</p>
                                 <p>{'✅ 存活' if player.alive else '❌ 出局'}</p>
                             </div>""", unsafe_allow_html=True)
 
@@ -777,7 +799,7 @@ def manual_game_page():
             if st.session_state.game:
                 selected_action = st.selectbox("选择操作",options=["上帝广播","私聊","公共聊天","群发公共聊天"],key="selected_action", index=0)
 
-                player_options = [f"{player.id}号{player_role_to_chinese[player.role]}" for player in st.session_state.game.get_players(t="object")] + ["全体存活玩家","全体玩家"]
+                player_options = [f"{player.id}号{player_role_to_chinese.get(player.role,player.role)}" for player in st.session_state.game.get_players(t="object")] + ["全体存活玩家","全体玩家"]
 
                 match selected_action:
                     case "上帝广播":
@@ -846,7 +868,7 @@ def manual_game_page():
                         game.broadcast(f"现在是第{days}天{'白天' if morning_dusk else '晚上'}")
 
         with st.expander("👥 玩家管理", expanded=True):
-            players_out = st.text_input("请输入玩家编号，用英文逗号分隔", key="player_name",value="")
+            players_out = st.text_input("请输入出局玩家编号，用英文逗号分隔", key="out_player_name",value="")
             try:
                 if st.button("踢出玩家", disabled= not st.session_state.msg_progress.is_set() if st.session_state.msg_progress else False):
                     players_out_id = [int(player_id) for player_id in players_out.split(",")]
@@ -855,6 +877,17 @@ def manual_game_page():
                     st.rerun()
             except Exception as e:
                 st.error(f"踢出失败: {str(e)}")
+            st.divider()
+            players_in = st.text_input("请输入重新加入的玩家编号，用英文逗号分隔", key="add_player_name",value="")
+            try:
+                if st.button("加入玩家", disabled= not st.session_state.msg_progress.is_set() if st.session_state.msg_progress else False):
+                    players_out_id = [int(player_id) for player_id in players_out.split(",")]
+                    game.no_out(players_out_id)
+                    st.success(f"重新加入成功，{str(players_out_id)[1:-1]}号玩家重返游戏")
+                    st.rerun()
+            except Exception as e:
+                st.error(f"加入失败: {str(e)}")
+
 
     # 主界面布局
     if st.session_state.game and st.session_state.initialized:
@@ -899,7 +932,7 @@ def manual_game_page():
                             role_color = ROLE_COLORS.get(player.role, "#FFF")
                             st.markdown(f"""<div style='text-align: center; padding: 12px; border-radius: 12px;background-color: {role_color};'>
                                 <h4>玩家{player.id}</h4>
-                                <p>{ROLE_ICONS.get(player.role,"❓")}</p>
+                                <p>{ROLE_ICONS.get(player.role,"❓"+player.role)}</p>
                                 <p>{'✅ 存活' if player.alive else '❌ 出局'}</p>
                             </div>""", unsafe_allow_html=True)
 

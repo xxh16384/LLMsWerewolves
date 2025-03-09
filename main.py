@@ -791,6 +791,24 @@ class Game:
             i.alive = False
         self.broadcast(f"{str(player_ids)[1:-1]}号玩家出局")
 
+    def no_out(self,player_ids:list):
+        """
+        to no out players, given player_ids list.
+        this will directly set the alive status of given players to True,
+        and broadcast the message to all players.
+        Args:
+            player_ids (list): list of player ids
+        """
+        if not player_ids:
+            self.broadcast("加入失败")
+            return
+        players_pending = self.get_players_by_ids(player_ids)
+        if not players_pending:
+            raise ValueError("加入失败")
+        for i in players_pending:
+            i.alive = True
+        self.broadcast(f"{str(player_ids)[1:-1]}号玩家加入")
+
     def day_night_change(self):
         """
         Advances the game stage by one, transitioning between day and night.
