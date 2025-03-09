@@ -268,6 +268,9 @@ class Player:
                         print(reasoning_message, end="", flush=True)
                     except:
                         reasoning_model = 0
+                        chunk_message = chunk.choices[0].delta.content
+                        collected_messages += chunk_message
+                        print(chunk_message, end="", flush=True)
                 elif reasoning_model == 1:
                     reasoning_message = chunk.choices[0].delta.reasoning_content
                     chunk_message = chunk.choices[0].delta.content
@@ -294,46 +297,43 @@ class Player:
         else:
             collected_messages = ""
             c = lambda content,last_block=False:Context(self.game, self.id,content,visible_ids=visible_ids,is_streaming=True,last_block=last_block)
+            reasoning_model = -1 # 判断是否是推理模型，-1待判断，0不是，1是
             for chunk in response:
-                chunk_content = chunk.choices[0].delta.content or ""
-                collected_messages += chunk_content
-                reasoning_model = -1 # 判断是否是推理模型，-1待判断，0不是，1是
-                for chunk in response:
-                    if reasoning_model == -1:
-                        try:
-                            reasoning_message = chunk.choices[0].delta.reasoning_content
-                            reasoning_model = 1
-                            reasoning = True
-                            collected_messages += "<think>\n" + reasoning_message
-                            c("<think>\n")
-                            c(reasoning_message)
-                        except:
-                            reasoning_model = 0
-                            chunk_message = chunk.choices[0].delta.content
-                            c(chunk_message)
-                            collected_messages += chunk_message
-                    elif reasoning_model == 1:
+                if reasoning_model == -1:
+                    try:
                         reasoning_message = chunk.choices[0].delta.reasoning_content
+                        reasoning_model = 1
+                        reasoning = True
+                        collected_messages += "<think>\n" + reasoning_message
+                        c("<think>\n")
+                        c(reasoning_message)
+                    except:
+                        reasoning_model = 0
                         chunk_message = chunk.choices[0].delta.content
-                        if reasoning_message and reasoning:
-                            c(reasoning_message)
-                            collected_messages += reasoning_message
-                        elif not reasoning_message and reasoning and chunk_message:
-                            c("\n</think>\n")
-                            reasoning = False
-                            collected_messages += "\n</think>\n" + chunk_message
-                            c(chunk_message)
-                        elif not reasoning:
-                            collected_messages += chunk_message
-                            c(chunk_message)
-                    else:
-                        chunk_message = chunk.choices[0].delta.content
+                        c(chunk_message)
+                        collected_messages += chunk_message
+                elif reasoning_model == 1:
+                    reasoning_message = chunk.choices[0].delta.reasoning_content
+                    chunk_message = chunk.choices[0].delta.content
+                    if reasoning_message and reasoning:
+                        c(reasoning_message)
+                        collected_messages += reasoning_message
+                    elif not reasoning_message and reasoning and chunk_message:
+                        c("\n</think>\n")
+                        reasoning = False
+                        collected_messages += "\n</think>\n" + chunk_message
+                        c(chunk_message)
+                    elif not reasoning:
                         collected_messages += chunk_message
                         c(chunk_message)
+                else:
+                    chunk_message = chunk.choices[0].delta.content
+                    collected_messages += chunk_message
+                    c(chunk_message)
 
-                # 触发前端更新
-                if hasattr(self.game, 'streamlit_log_trigger'):
-                    self.game.streamlit_log_trigger.set()
+            # 触发前端更新
+            if hasattr(self.game, 'streamlit_log_trigger'):
+                self.game.streamlit_log_trigger.set()
 
             # 保存完整消息
             c("",True)

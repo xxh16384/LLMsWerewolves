@@ -46,7 +46,12 @@ def init_session_state():
     if 'phase_progress' not in st.session_state:
         st.session_state.phase_progress = None
     if 'models' not in st.session_state:
-        st.session_state.models = []
+        st.session_state.models = [{
+                            "name": "QwQ-32B试用版（可能卡顿）",
+                            "api_key": "sk-W0rpStc95T7JVYVwDYc29IyirjtpPPby6SozFMQr17m8KWeo",
+                            "base_url": "https://api.suanli.cn/v1",
+                            "model_name": "free:QwQ-32B"
+                        }]
     if 'players' not in st.session_state:
         st.session_state.players = []
     if 'player_num' not in st.session_state:
