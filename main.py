@@ -779,6 +779,8 @@ class Game:
             self.broadcast("出局失败")
             return
         players_pending = self.get_players_by_ids(player_ids)
+        if not players_pending:
+            raise ValueError("出局失败")
         for i in players_pending:
             i.alive = False
         self.broadcast(f"{str(player_ids)[1:-1]}号玩家出局")

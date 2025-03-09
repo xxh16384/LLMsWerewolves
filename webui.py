@@ -667,6 +667,7 @@ def auto_game_page():
 
                                 if not phase:
                                     # 每个操作前检查状态
+                                    # game对象会自动生成killing toninght列表，在昼夜更替的时候踢出玩家
                                     if not game.game_over() and not progress_event.is_set(): game.werewolf_killing()
                                     if not game.game_over() and not progress_event.is_set(): game.seer_seeing()
                                     if not game.game_over() and not progress_event.is_set(): game.witch_operation()
