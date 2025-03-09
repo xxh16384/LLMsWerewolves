@@ -31,7 +31,7 @@ def extract_numbers_from_brackets(text):
         list: 文本中所有的数字
     """
     numbers = []
-    
+
     # 查找文本中所有的“[” 和 “]”
     start = text.find('[')
     while start != -1:
@@ -602,7 +602,10 @@ class Game:
         Seer -> Server: "[7]号玩家"
         Server -> Seer: "你今晚要查的玩家是7号玩家，他的身份是witch"
         """
-        seer = self.get_players(role="seer",alive=False)[0]
+        seer = self.get_players(role="seer",alive=False)
+        if not seer:
+            return
+        seer = seer[0]
         if not seer.alive:
             return
         seer.private_chat(0,"你今晚要查谁？要查询的玩家编号请用[]包围，例如'我要查询[7]号玩家'。可以简短的给出理由。")
@@ -618,7 +621,10 @@ class Game:
         如果女巫选择毒杀，女巫将被标记为毒药
         如果女巫没有毒药，女巫不能毒杀
         """
-        witch = self.get_players(role="witch",alive=False)[0]
+        witch = self.get_players(role="witch",alive=False)
+        if not witch:
+            return
+        witch = witch[0]
         if not witch.alive:
             return
         if self.kill_tonight:

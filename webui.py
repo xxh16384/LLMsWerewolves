@@ -453,6 +453,15 @@ def config_page():
                     validation_errors.append(f"玩家 {i+1} 使用的模型不存在")
                     valid = False
 
+            is_werewolve = False
+            for player in st.session_state.players:
+                if player["role"] == "werewolf":
+                    is_werewolve = True
+                    break
+            if not is_werewolve:
+                validation_errors.append("至少需要一个狼人")
+                valid = False
+
             # 显示验证结果
             if validation_errors:
                 st.error("配置存在问题：\n- " + "\n- ".join(validation_errors))
