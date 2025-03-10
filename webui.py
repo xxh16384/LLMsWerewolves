@@ -352,7 +352,7 @@ def config_page():
                             if new_role in stander_roles:
                                 st.error("自定义角色名不能与标准角色名重复")
                                 new_role = current_role
-                                st.session_state.instructions[new_role] = ""
+                            st.session_state.instructions[new_role] = ""
 
 
                         # 模型选择
