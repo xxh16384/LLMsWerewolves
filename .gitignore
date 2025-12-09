@@ -1,4 +1,6 @@
 /__pycache__
-test.py
+core/__pycache__
 /log
+
+test.py
 config/api_template.json
