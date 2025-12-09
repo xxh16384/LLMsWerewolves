@@ -4,3 +4,5 @@ core/__pycache__
 
 test.py
 config/api_template.json
+config/api_player.json
+config/player_info.json
