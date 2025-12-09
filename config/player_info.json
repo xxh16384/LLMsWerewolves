@@ -1,35 +1,27 @@
 {
     "0":"这是一局有8个玩家的狼人杀游戏，分别有3个狼人，3个村民，一个预言家和一个女巫",
     "1":{
-    "role":"werewolf",
-    "model":"qwq"
+    "role":"werewolf"
     },
     "2":{
-    "role":"werewolf",
-    "model":"qwq"
+    "role":"werewolf"
     },
     "3":{
-    "role":"villager",
-    "model":"qwq"
+    "role":"villager"
     },
     "4":{
-    "role":"villager",
-    "model":"qwq"
+    "role":"villager"
     },
     "5":{
-    "role":"villager",
-    "model":"qwq"
+    "role":"villager"
     },
     "6":{
-    "role":"witch",
-    "model":"qwq"
+    "role":"witch"
     },
     "7":{
-    "role":"seer",
-    "model":"qwq"
+    "role":"seer"
     },
     "8":{
-    "role":"werewolf",
-    "model":"qwq"
+    "role":"werewolf"
     }
 }
