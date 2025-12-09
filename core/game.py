@@ -191,36 +191,40 @@ class Game:
             None
         """
 
-        players_pending = self.get_players(role="werewolf")
-        if not players_pending:
+        def talk_werewolf(target, message: str):
+            target.private_chat(0, message)
+
+        def record_werewolf(message: str):
+            # 将消息加入预言家的上下文
+            Context(self, 0, message, self.get_players(t="id", role="werewolf"))
+
+        wolves = self.get_players(role="werewolf")
+
+        if not wolves:
             return
-        content = "今晚你想杀谁？"
-        for i in players_pending:
-            i.private_chat(0, content)
-        content = "请进行杀人投票，杀人投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以自由发言解释杀人理由。"
-        for i in players_pending:
-            i.private_chat(0, content)
-        result = {i.id: 0 for i in self.get_players()}
-        for i in players_pending:
-            voted = extract_numbers_from_brackets(i.messages[-1]["content"])
-            if voted and int(voted[-1]) in self.get_players("id"):
-                result[int(voted[-1])] += 1
-        killed = find_max_key(result)
-        if killed:
-            Context(
-                self,
-                0,
-                f"今晚{killed}号玩家被狼人标记要杀",
-                self.get_players(t="id", role="werewolf", alive=False),
+
+        for wolf in wolves:
+            talk_werewolf(wolf, "今晚你想杀谁？现在是讨论阶段。")
+
+        for wolf in wolves:
+            talk_werewolf(
+                wolf,
+                "请进行杀人投票，杀人投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以自由发言解释杀人理由。",
             )
+
+        result = {player.id: 0 for player in self.get_players()}
+
+        for wolf in wolves:
+            ToKilled = extract_numbers_from_brackets(wolf.messages[-1]["content"])
+            if ToKilled and int(ToKilled[-1]) in self.get_players("id"):
+                result[int(ToKilled[-1])] += 1
+
+        killed = find_max_key(result)
+        if killed and killed != 0:
+            record_werewolf(f"在{self.get_day}的晚上，{killed}号玩家被狼人标记要杀")
             self.kill_tonight.append(killed)
         else:
-            Context(
-                self,
-                0,
-                f"击杀失败",
-                self.get_players(t="id", role="werewolf", alive=False),
-            )
+            record_werewolf(f"在{self.get_day}的晚上，狼人没有选择任何人要杀")
 
     def seer_seeing(self):
         """
@@ -234,20 +238,25 @@ class Game:
         Seer -> Server: "[7]号玩家"
         Server -> Seer: "你今晚要查的玩家是7号玩家，他的身份是witch"
         """
-        seer = self.get_players(role="seer", alive=False)
+
+        def talk_seer(message: str):
+            # 通知预言家消息
+            seer.private_chat(0, message)
+
+        def record_seer(message: str):
+            # 将消息加入预言家的上下文
+            Context(self, 0, message, self.get_players(t="id", role="seer"))
+
+        seer = self.get_players(role="seer")
         if not seer:
             return
         seer = seer[0]
-        if not seer.alive:
-            return
-        seer.private_chat(
-            0,
-            "你今晚要查谁？要查询的玩家编号请用[]包围，例如'我要查询[7]号玩家'。可以简短的给出理由。",
+        talk_seer(
+            "你今晚要查谁？要查询的玩家编号请用[]包围，例如'我要查询[7]号玩家'。可以简短的给出理由。"
         )
         target = extract_numbers_from_brackets(seer.messages[-1]["content"])
-        seer.private_chat(
-            0,
-            f"你今晚要查的玩家是{self.get_players_by_ids(target)[0]}，他的身份是{self.get_players_by_ids(target)[0].role}",
+        record_seer(
+            f"在{self.get_day}的晚上，你查的玩家是{self.get_players_by_ids(target)[0]}，他的身份是{self.get_players_by_ids(target)[0].role}"
         )
 
     def witch_operation(self):
