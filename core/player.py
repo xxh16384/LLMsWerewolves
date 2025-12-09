@@ -3,9 +3,8 @@ from .context import Context
 from core.general import *
 
 
-
 class Player:
-    def __init__(self, role:str, id:int, game):
+    def __init__(self, role: str, id: int, game):
         """
         Initializes a Player instance with the given model, role, id, and game context.
 
@@ -33,12 +32,17 @@ class Player:
         self.role = role
         self.id = id
         self.alive = True
+
+        self.recognition = ""  # 当前是第几天的什么阶段
+
         self.messages = []
+        self.init_role_special()
+        game.players.append(self)
+
+    def init_role_special(self):
         if self.role == "witch":
             self.poison = False
             self.antidote = False
-        game.players.append(self)
-
 
     def init_system_prompt(self):
         """
@@ -62,12 +66,11 @@ class Player:
 
         pre_instruction = f"你是{self.id}号玩家，" + self.game.instructions[self.role]
         if self.role == "werewolf":
-            wolfs = self.game.get_players("id",alive=False,role="werewolf")
+            wolfs = self.game.get_players("id", alive=False, role="werewolf")
             pre_instruction += f"\n以下玩家是狼人{str(wolfs)[1:-1]}，是你和你的队友"
-        self.messages.append({"role":"system","content":pre_instruction})
+        self.messages.append({"role": "system", "content": pre_instruction})
 
-
-    def get_response(self,prompt,if_pub):
+    def get_response(self, prompt, if_pub):
         """
         Simulates a conversation with the player, given a prompt and whether the response should be public.
 
@@ -89,31 +92,46 @@ class Player:
         Side Effects:
             The player's response is appended to the game's context as a new message.
         """
-        
+
         sleep(1)
-        
-        visible_ids = self.game.get_players("id",alive=False) if if_pub else [self.id,0] + self.game.get_players("id",role=self.role)
-        pub_messages = Context.get_context(self.id,self.game)
+
+        visible_ids = (
+            self.game.get_players("id", alive=False)
+            if if_pub
+            else [self.id, 0] + self.game.get_players("id", role=self.role)
+        )
+        pub_messages = Context.get_context(self.id, self.game)
         prompt0 = prompt
         if if_pub:
-            prompt = f"\n此前你能得知的玩家发言以及公共信息如下：{str(pub_messages)}...注意：你现在在公共发言阶段，你的所有输出会被所有玩家听到，请直接口语化的输出你想表达的信息，不要暴露你的意图。（连括号中的内容也会被看到）" + prompt
+            prompt = (
+                f"\n此前你能得知的玩家发言以及公共信息如下：{str(pub_messages)}...注意：你现在在公共发言阶段，你的所有输出会被所有玩家听到，请直接口语化的输出你想表达的信息，不要暴露你的意图。（连括号中的内容也会被看到）"
+                + prompt
+            )
         else:
-            prompt = f"\n此前你能得知的玩家发言以及公共信息如下：{str(pub_messages)}...注意：你现在在私聊阶段，你的输出只会被上帝听到。（如果你是狼人，你的聊天还会被同阵营的玩家听到）" + prompt
-        self.messages.append({"role":"user","content":prompt})
-        
-        # print(f"{self} 的上下文： {self.messages}")
-        
+            prompt = (
+                f"\n此前你能得知的玩家发言以及公共信息如下：{str(pub_messages)}...注意：你现在在私聊阶段，你的输出只会被上帝听到。（如果你是狼人，你的聊天还会被同阵营的玩家听到）"
+                + prompt
+            )
+
+        self.messages.append({"role": "user", "content": prompt})
+
+        message_and_time = self.messages.copy()
+
+        message_and_time.append({"role": "system", "content": f"现在是{self.game}。"})
+
+        print(f"{self} 的上下文： {message_and_time}")
+
         response = self.client.chat.completions.create(
-            model = self.game.apis["Model abbreviation"]["model_name"],
-            messages = self.messages,
-            stream = True
+            model=self.game.apis["Model abbreviation"]["model_name"],
+            messages=message_and_time,
+            stream=True,
         )
         self.messages[-1]["content"] = prompt0
 
         # 处理回复
         collected_messages = ""
         reasoning_messages = ""
-        reasoning_model = -1 # 判断是否是推理模型，-1待判断，0不是，1是
+        reasoning_model = -1  # 判断是否是推理模型，-1待判断，0不是，1是
         print(f"玩家{self.id}（{self.role}）： ", end="", flush=True)
         for chunk in response:
             if reasoning_model == -1:
@@ -150,14 +168,16 @@ class Player:
 
         print("")
         # 加入公共上下文
-        collected_messages = "<think>"+reasoning_messages+"</think>" + collected_messages if reasoning_messages else collected_messages
-        Context(self.game,self.id,collected_messages,visible_ids)
+        collected_messages = (
+            "<think>" + reasoning_messages + "</think>" + collected_messages
+            if reasoning_messages
+            else collected_messages
+        )
+        Context(self.game, self.id, collected_messages, visible_ids)
 
+        self.messages.append({"role": "assistant", "content": collected_messages})
 
-        self.messages.append({"role":"assistant","content":collected_messages})
-
-
-    def private_chat(self,source_id,content):
+    def private_chat(self, source_id, content):
         """
         Allows a player to send a private chat message to another player.
 
@@ -165,20 +185,19 @@ class Player:
             source_id (int): The ID of the player sending the message.
             content (str): The content of the chat message to be sent.
         """
-        
+
         if source_id == 0:
-            Context(self.game,0,f"{content}",[self.id])
+            Context(self.game, 0, f"{content}", [self.id])
             # if not self.game.webui_mode:
             #     print(f"上帝：{content}")
-            self.get_response(f"上帝：{content}",False)
+            self.get_response(f"上帝：{content}", False)
         else:
-            Context(self.game,source_id,f"{content}",[self.id])
+            Context(self.game, source_id, f"{content}", [self.id])
             if not self.game.webui_mode:
                 print(f"{source_id}号玩家：{content}")
-            self.get_response(f"{source_id}号玩家：{content}",False)
+            self.get_response(f"{source_id}号玩家：{content}", False)
 
-
-    def pub_chat(self,source_id,content,add_to_context = True):
+    def pub_chat(self, source_id, content, add_to_context=True):
         """
         Handles public chat messages within the game context.
 
@@ -193,12 +212,13 @@ class Player:
         """
 
         if source_id == 0:
-            self.get_response(f"上帝：{content}",True)
+            self.get_response(f"上帝：{content}", True)
         else:
-            self.get_response(f"{source_id}号玩家：{content}",True)
+            self.get_response(f"{source_id}号玩家：{content}", True)
         if add_to_context:
-            Context(self.game,source_id,content,self.game.get_player(t="id",alive=False))
-
+            Context(
+                self.game, source_id, content, self.game.get_player(t="id", alive=False)
+            )
 
     def __str__(self):
         return f"玩家{self.id}（{PLAYERDIC[self.role]}）"

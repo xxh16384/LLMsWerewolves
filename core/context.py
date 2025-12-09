@@ -1,10 +1,18 @@
 import re
 
 
-
 class Context:
     contexts = {}
-    def __init__(self,game,source_id,content,visible_ids = [],is_streaming = False, last_block = False):
+
+    def __init__(
+        self,
+        game,
+        source_id,
+        content,
+        visible_ids=[],
+        is_streaming=False,
+        last_block=False,
+    ):
         """
         保存游戏中的一个信息
 
@@ -17,11 +25,15 @@ class Context:
 
         if game not in Context.contexts.keys():
             Context.contexts[game] = []
-        
+
         streaming = False if last_block else True
         if is_streaming:
             pre_block = Context.contexts[game][-1]
-            if pre_block.source_id == source_id and pre_block.is_streaming and not pre_block.last_block:
+            if (
+                pre_block.source_id == source_id
+                and pre_block.is_streaming
+                and not pre_block.last_block
+            ):
                 # 说明和前一条是一个人说的，则更新最后一条
                 content = pre_block.content + content
                 Context.contexts[game].pop(-1)
@@ -32,16 +44,18 @@ class Context:
         self.last_block = last_block
         self.source_id = source_id
         self.content = content
-        self.visible_ids = set(visible_ids + [source_id,0] if visible_ids else [source_id,0])
+        self.visible_ids = set(
+            visible_ids + [source_id, 0] if visible_ids else [source_id, 0]
+        )
 
         if self.game:
             if not streaming:
                 self.game.logger.info(self.__str__())
             # 强制触发日志更新（关键改进点）
-            if hasattr(self.game, 'streamlit_log_trigger'):
+            if hasattr(self.game, "streamlit_log_trigger"):
                 self.game.streamlit_log_trigger.set()
 
-    def get_context(id,game):
+    def get_context(id, game):
         """
         根据玩家id和游戏id，返回该玩家可以看到的所有信息
 
@@ -54,10 +68,12 @@ class Context:
         """
         pub_messages = []
         for i in Context.contexts[game]:
-            if id in i.visible_ids: #自己可见的
-                pub_messages.append(re.sub(r'<think>.*?</think>', '', str(i), flags=re.DOTALL))
+            if id in i.visible_ids:  # 自己可见的
+                pub_messages.append(
+                    re.sub(r"<think>.*?</think>", "", str(i), flags=re.DOTALL)
+                )
         return pub_messages
-    
+
     def get_chat_log(game, stage):
         """
         根据游戏id和阶段，返回该阶段所有信息
