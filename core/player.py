@@ -197,7 +197,7 @@ class Player:
                 print(f"{source_id}号玩家：{content}")
             self.get_response(f"{source_id}号玩家：{content}", False)
 
-    def pub_chat(self, source_id, content, add_to_context=True):
+    def pub_chat(self, source_id, content):
         """
         Handles public chat messages within the game context.
 
@@ -211,14 +211,13 @@ class Player:
             content (str): The content of the message to be sent publicly.
         """
 
+        Context(
+            self.game, source_id, content, self.game.get_player(t="id", alive=False)
+        )
         if source_id == 0:
             self.get_response(f"上帝：{content}", True)
         else:
             self.get_response(f"{source_id}号玩家：{content}", True)
-        if add_to_context:
-            Context(
-                self.game, source_id, content, self.game.get_player(t="id", alive=False)
-            )
 
     def __str__(self):
         return f"玩家{self.id}（{PLAYERDIC[self.role]}）"

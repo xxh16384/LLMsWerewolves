@@ -66,3 +66,7 @@ def find_max_key(vote_dict):
     max_value = max(vote_dict.values())
     max_keys = [k for k, v in vote_dict.items() if v == max_value]
     return max_keys[0] if len(max_keys) == 1 else 0
+
+
+def makeDic(array):
+    return {element.id: 0 for element in array}

@@ -3,7 +3,7 @@ import json
 import logging
 import os
 from time import time
-from .tools import read_json, extract_numbers_from_brackets, find_max_key
+from .tools import read_json, extract_numbers_from_brackets, find_max_key, makeDic
 from .context import Context
 from .player import Player
 from .general import *
@@ -212,7 +212,7 @@ class Game:
                 "请进行杀人投票，杀人投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以自由发言解释杀人理由。",
             )
 
-        result = {player.id: 0 for player in self.get_players()}
+        result = makeDic(self.get_players())
 
         for wolf in wolves:
             ToKilled = extract_numbers_from_brackets(wolf.messages[-1]["content"])
@@ -328,10 +328,8 @@ class Game:
             None
         """
         players_pending = self.get_players()
-        content = "请公开讨论，在此阶段你可以简短发言，解释讨论理由。"
-        Context(self, 0, content, self.get_players(t="id", alive=False))
-        for i in players_pending:
-            i.pub_chat(0, content, add_to_context=False)
+        for player in players_pending:
+            player.pub_chat(0, "请公开讨论，在此阶段你可以简短发言，解释讨论理由。")
 
     def vote(self) -> dict:
         """
@@ -344,11 +342,12 @@ class Game:
                 are the number of votes they got.
         """
         players_pending = self.get_players()
-        content = "请投票，投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以简短发言，解释投票理由。"
-        Context(self, 0, content, self.get_players(t="id", alive=False))
-        for i in players_pending:
-            i.pub_chat(0, content, add_to_context=False)
-        result = {i.id: 0 for i in players_pending}
+        for player in players_pending:
+            player.pub_chat(
+                0,
+                "请投票，投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以简短发言，解释投票理由。",
+            )
+        result = makeDic(players_pending)
         for i in players_pending:
             voted = extract_numbers_from_brackets(i.messages[-1]["content"])
             if voted and int(voted[-1]) in self.get_players("id"):
@@ -402,27 +401,6 @@ class Game:
                     self.get_players(t="id", alive=False),
                 )
                 return "好人"
-
-    def private_chat(self, player_id: int, content: str):
-        """
-        Allows a player to send a private chat message to the game.
-
-        Args:
-            player_id (int): The ID of the player sending the message.
-            content (str): The content of the chat message to be sent.
-        """
-        self.get_players_by_ids([player_id])[0].private_chat(0, content)
-
-    def public_chat(self, player_id: int, content: str, add_to_context: bool = True):
-        """
-        Allows a player to send a public chat message.
-
-        Args:
-            player_id (int): The ID of the player sending the message.
-            content (str): The content of the chat message to be sent.
-        """
-
-        self.get_players_by_ids([player_id])[0].pub_chat(0, content, add_to_context)
 
     def broadcast(self, content):
         """
