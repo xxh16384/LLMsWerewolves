@@ -39,29 +39,33 @@ if __name__ == "__main__":
                     # 进入下一夜
                     game.day_night_change()
                 case "2":
+                    # 守护保人
+                    game.guard_guarding()
+                    print("守卫保卫阶段结束")
+                case "3":
                     # 狼人杀人
                     game.werewolf_killing()
                     print("狼人杀人阶段结束")
-                case "3":
+                case "4":
                     # 预言家查验
                     game.seer_seeing()
                     print("预言家查验阶段结束")
-                case "4":
+                case "5":
                     # 女巫操作
                     game.witch_operation()
                     print("女巫操作阶段结束")
-                case "5":
+                case "6":
                     game.day_night_change()
                     print(f"已进入: {game}")
                     # 公共讨论
                     game.public_discussion()
                     print("公共讨论阶段结束")
-                case "6":
+                case "7":
                     # 投票
                     result = find_max_key(game.vote())
                     game.out([result])
                     print("投票阶段结束")
-                case "7":
+                case "8":
                     # 显示当前状态
                     print(
                         f"\n ————————————————————\
@@ -72,7 +76,7 @@ if __name__ == "__main__":
                     )
                     for player in game.get_players(alive=True):
                         print(f" {player}")
-                case "8":
+                case "9":
                     # 结束游戏
                     print("游戏已手动结束")
                     exit(0)

@@ -47,6 +47,7 @@ class Game:
         self.players = []
         self.init_game()
         self.kill_tonight = []
+        self.guard_tonight = []
 
     def set_logger(self):
         """
@@ -154,6 +155,34 @@ class Game:
         players_pending = [i for i in self.players if i.id in ids]
         return players_pending
 
+    def guard_guarding(self):
+        """
+        不写注释了。
+        """
+
+        def talk_guard(message: str):
+            # 通知守卫消息
+            guard.private_chat(0, message)
+
+        def record_guard(message: str):
+            # 将消息加入守卫的上下文
+            Context(self, 0, message, self.get_players(t="id", role="guard"))
+
+        guard = self.get_players(role="guard")
+        if not guard:
+            return
+        guard = guard[0]
+
+        talk_guard(
+            "你今晚要保护谁？要保护的玩家编号请用[]包围，若不保护人则输出[0]，例如'我要保护[7]号玩家'或'我不想保护人，[0]'。可以简短的给出理由。"
+        )
+        target = extract_numbers_from_brackets(guard.messages[-1]["content"])
+        if target and target != 0:
+            record_guard(
+                f"在{self.get_day}的晚上，你保护了玩家{self.get_players_by_ids(target)[0]}。"
+            )
+        self.guard_tonight.append(target)
+
     def werewolf_killing(self):
         """
         Executes the werewolf killing phase during the night.
@@ -203,10 +232,11 @@ class Game:
 
         killed = find_max_key(result)
         if killed and killed != 0:
-            record_werewolf(f"在{self.get_day}的晚上，{killed}号玩家被狼人标记要杀")
-            self.kill_tonight.append(killed)
+            record_werewolf(f"在{self.get_day}的晚上，{killed}号玩家被狼人标记要杀。")
+            if not killed in self.guard_tonight:
+                self.kill_tonight.append(killed)
         else:
-            record_werewolf(f"在{self.get_day}的晚上，狼人没有选择任何人要杀")
+            record_werewolf(f"在{self.get_day}的晚上，狼人没有选择任何人要杀。")
 
     def seer_seeing(self):
         """
@@ -238,7 +268,7 @@ class Game:
         )
         target = extract_numbers_from_brackets(seer.messages[-1]["content"])
         record_seer(
-            f"在{self.get_day}的晚上，你查的玩家是{self.get_players_by_ids(target)[0]}，他的身份是{self.get_players_by_ids(target)[0].role}"
+            f"在{self.get_day}的晚上，你查的玩家是{self.get_players_by_ids(target)[0]}，他的身份是{self.get_players_by_ids(target)[0].role}。"
         )
 
     def witch_operation(self):
@@ -444,6 +474,7 @@ class Game:
         self.stage += 1
         days, morning_dusk = self.get_game_stage()
         # self.broadcast(f"现在是第{days}天{'白天' if morning_dusk else '晚上'}")
+        self.guard_tonight = []
         if morning_dusk == 1 and days > 1:
             if self.kill_tonight:
                 self.kill_tonight = list(set(self.kill_tonight))
