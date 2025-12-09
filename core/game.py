@@ -62,38 +62,20 @@ class Game:
             None
         """
 
-        logger = logging.getLogger(str(self.id))
-        logger.setLevel(logging.DEBUG)
-
-        # 创建控制台处理器 (Console Handler)
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
-
         # 创建文件处理器 (File Handler)
         if not os.path.exists("./log"):
             os.mkdir("./log")
-        log_file_path = f"./log/{self.game_name}-id={self.id}.md"
-        fh = logging.FileHandler(log_file_path, encoding="UTF-8")
-        fh.setLevel(logging.INFO)
-        fh.setFormatter(
-            logging.Formatter(
-                "**%(asctime)s - %(levelname)s**\n%(message)s",
-                datefmt="%Y-%m-%d %H:%M:%S",
-            )
+
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            filename=f"./log/{self.game_name}-id={self.id}.md",
+            encoding="UTF-8",
         )
 
-        # 设置日志格式
-        formatter = logging.Formatter("**%(asctime)s - %(levelname)s**\n%(message)s")
-        ch.setFormatter(formatter)
-        fh.setFormatter(formatter)
+        logger = logging.getLogger(str(self.id))
 
-        # 将处理器添加到 logger
-        logger.addHandler(ch)
-        logger.addHandler(fh)
-
-        # 初始化日志文件内容
-        with open(log_file_path, "w", encoding="UTF-8") as f:
-            f.write(f"# {self.game_name}\n\n")
+        logger.debug("这是一条调试信息")
 
         self.logger = logger
 
