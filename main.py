@@ -2,7 +2,7 @@ from openai import OpenAI
 import json
 import logging
 import os
-import time
+from time import sleep, time
 import re
 
 # 工具函数
@@ -154,7 +154,7 @@ class Context:
         return f"{self.source_id}号玩家:{self.content}（{v_id}可见）\n"
 
 class Player:
-    def __init__(self,model:str,role:str,id:int,game):
+    def __init__(self, role:str, id:int, game):
         """
         Initializes a Player instance with the given model, role, id, and game context.
 
@@ -177,10 +177,10 @@ class Player:
         """
 
         self.game = game
-        self.client = OpenAI(api_key = game.apis[model]["api_key"], base_url = game.apis[model]["base_url"])
+        # self.client = OpenAI(api_key = game.apis["Model abbreviation"]["api_key"], base_url = game.apis["Model abbreviation"]["base_url"])
+        self.client = game.client
         self.role = role
         self.id = id
-        self.model = model
         self.alive = True
         self.messages = []
         if self.role == "witch":
@@ -236,6 +236,9 @@ class Player:
         Side Effects:
             The player's response is appended to the game's context as a new message.
         """
+        
+        sleep(1)
+        
         visible_ids = self.game.get_players("id",alive=False) if if_pub else [self.id,0] + self.game.get_players("id",role=self.role)
         pub_messages = Context.get_context(self.id,self.game)
         prompt0 = prompt
@@ -244,99 +247,58 @@ class Player:
         else:
             prompt = f"\n此前你能得知的玩家发言以及公共信息如下：{str(pub_messages)}...注意：你现在在私聊阶段，你的输出只会被上帝听到。（如果你是狼人，你的聊天还会被同阵营的玩家听到）" + prompt
         self.messages.append({"role":"user","content":prompt})
+        
+        # print(f"{self} 的上下文： {self.messages}")
+        
         response = self.client.chat.completions.create(
-            model = self.game.apis[self.model]["model_name"],
+            model = self.game.apis["Model abbreviation"]["model_name"],
             messages = self.messages,
             stream = True
         )
         self.messages[-1]["content"] = prompt0
 
         # 处理回复
-        if not self.game.webui_mode:
-            collected_messages = ""
-            reasoning_messages = ""
-            reasoning_model = -1 # 判断是否是推理模型，-1待判断，0不是，1是
-            print(f"玩家{self.id}（{self.role}）： ", end="", flush=True)
-            for chunk in response:
-                if reasoning_model == -1:
-                    try:
-                        reasoning_message = chunk.choices[0].delta.reasoning_content
-                        reasoning_messages += reasoning_message
-                        reasoning_model = 1
-                        reasoning = True
-                        print("思考中...\n", end="", flush=True)
-                        print(reasoning_message, end="", flush=True)
-                    except:
-                        reasoning_model = 0
-                        chunk_message = chunk.choices[0].delta.content
-                        collected_messages += chunk_message
-                        print(chunk_message, end="", flush=True)
-                elif reasoning_model == 1:
+        collected_messages = ""
+        reasoning_messages = ""
+        reasoning_model = -1 # 判断是否是推理模型，-1待判断，0不是，1是
+        print(f"玩家{self.id}（{self.role}）： ", end="", flush=True)
+        for chunk in response:
+            if reasoning_model == -1:
+                try:
                     reasoning_message = chunk.choices[0].delta.reasoning_content
-                    chunk_message = chunk.choices[0].delta.content
-                    if reasoning_message and reasoning:
-                        reasoning_messages += reasoning_message
-                        print(reasoning_message, end="", flush=True)
-                    elif not reasoning_message and reasoning and chunk_message:
-                        print("\n思考结束...\n")
-                        reasoning = False
-                        collected_messages += chunk_message
-                        print(chunk_message, end="", flush=True)
-                    elif not reasoning:
-                        collected_messages += chunk_message
-                        print(chunk_message, end="", flush=True)
-                else:
+                    reasoning_messages += reasoning_message
+                    reasoning_model = 1
+                    reasoning = True
+                    print("思考中...\n", end="", flush=True)
+                    print(reasoning_message, end="", flush=True)
+                except:
+                    reasoning_model = 0
                     chunk_message = chunk.choices[0].delta.content
                     collected_messages += chunk_message
                     print(chunk_message, end="", flush=True)
-
-            print("")
-            # 加入公共上下文
-            collected_messages = "<think>"+reasoning_messages+"</think>" + collected_messages if reasoning_messages else collected_messages
-            Context(self.game,self.id,collected_messages,visible_ids)
-        else:
-            collected_messages = ""
-            c = lambda content,last_block=False:Context(self.game, self.id,content,visible_ids=visible_ids,is_streaming=True,last_block=last_block)
-            reasoning_model = -1 # 判断是否是推理模型，-1待判断，0不是，1是
-            for chunk in response:
-                if reasoning_model == -1:
-                    try:
-                        reasoning_message = chunk.choices[0].delta.reasoning_content
-                        reasoning_model = 1
-                        reasoning = True
-                        collected_messages += "<think>\n" + reasoning_message
-                        c("<think>\n")
-                        c(reasoning_message)
-                    except:
-                        reasoning_model = 0
-                        chunk_message = chunk.choices[0].delta.content
-                        c(chunk_message)
-                        collected_messages += chunk_message
-                elif reasoning_model == 1:
-                    reasoning_message = chunk.choices[0].delta.reasoning_content
-                    chunk_message = chunk.choices[0].delta.content
-                    if reasoning_message and reasoning:
-                        c(reasoning_message)
-                        collected_messages += reasoning_message
-                    elif not reasoning_message and reasoning and chunk_message:
-                        c("\n</think>\n")
-                        reasoning = False
-                        collected_messages += "\n</think>\n" + chunk_message
-                        c(chunk_message)
-                    elif not reasoning:
-                        collected_messages += chunk_message
-                        c(chunk_message)
-                else:
-                    chunk_message = chunk.choices[0].delta.content
+            elif reasoning_model == 1:
+                reasoning_message = chunk.choices[0].delta.reasoning_content
+                chunk_message = chunk.choices[0].delta.content
+                if reasoning_message and reasoning:
+                    reasoning_messages += reasoning_message
+                    print(reasoning_message, end="", flush=True)
+                elif not reasoning_message and reasoning and chunk_message:
+                    print("\n思考结束...\n")
+                    reasoning = False
                     collected_messages += chunk_message
-                    c(chunk_message)
+                    print(chunk_message, end="", flush=True)
+                elif not reasoning:
+                    collected_messages += chunk_message
+                    print(chunk_message, end="", flush=True)
+            else:
+                chunk_message = chunk.choices[0].delta.content
+                collected_messages += chunk_message
+                print(chunk_message, end="", flush=True)
 
-            # 触发前端更新
-            if hasattr(self.game, 'streamlit_log_trigger'):
-                self.game.streamlit_log_trigger.set()
-
-            # 保存完整消息
-            c("",True)
+        print("")
+        # 加入公共上下文
+        collected_messages = "<think>"+reasoning_messages+"</think>" + collected_messages if reasoning_messages else collected_messages
+        Context(self.game,self.id,collected_messages,visible_ids)
 
 
         self.messages.append({"role":"assistant","content":collected_messages})
@@ -352,8 +314,8 @@ class Player:
         
         if source_id == 0:
             Context(self.game,0,f"{content}",[self.id])
-            if not self.game.webui_mode:
-                print(f"上帝：{content}")
+            # if not self.game.webui_mode:
+            #     print(f"上帝：{content}")
             self.get_response(f"上帝：{content}",False)
         else:
             Context(self.game,source_id,f"{content}",[self.id])
@@ -386,7 +348,7 @@ class Player:
         return f"玩家{self.id}（{self.role}）"
 
 class Game:
-    def __init__(self,game_name,players_info_path,apis_path,instructions_path,webui_mode = False,from_dict = False):
+    def __init__(self, game_name, players_info_path, apis_path, instructions_path):
         """
         Initialize a new game instance.
 
@@ -408,25 +370,18 @@ class Game:
         """
         self.game_name = game_name
         self.stage = 0
-        self.id = time.time()
+        self.id = time()
         self.set_logger()
-
-        if webui_mode and not from_dict:
-            self.instructions = json.loads(instructions_path.decode())
-            self.apis = json.loads(apis_path.decode())
-            self.players_info = json.loads(players_info_path.decode())
-        elif from_dict:
-            self.instructions = instructions_path
-            self.apis = apis_path
-            self.players_info = players_info_path
-        else:
-            self.instructions = read_json(instructions_path)
-            self.apis = read_json(apis_path)
-            self.players_info = read_json(players_info_path)
+        
+        self.instructions = read_json(instructions_path)
+        self.apis = read_json(apis_path)
+        self.players_info = read_json(players_info_path)
+        
+        self.client = OpenAI(api_key = self.apis["Model abbreviation"]["api_key"], base_url = self.apis["Model abbreviation"]["base_url"])
+        
         self.players = []
         self.init_game()
         self.kill_tonight = []
-        self.webui_mode = webui_mode
 
     def set_logger(self):
         """
@@ -441,6 +396,7 @@ class Game:
         Returns:
             None
         """
+        
         logger = logging.getLogger(str(self.id))
         logger.setLevel(logging.DEBUG)
 
@@ -490,9 +446,8 @@ class Game:
         for i in self.players_info.keys():
             if i == "0" or i == 0:
                 continue
-            model = self.players_info[i]["model"]
             roles = self.players_info[i]["role"]
-            Player(model,roles,int(i),self)
+            Player(roles,int(i),self)
         for i in self.players:
             i.init_system_prompt()
         Context(self,0,self.players_info["0"],self.get_players(t="id",alive=False))
@@ -870,31 +825,33 @@ if __name__ == "__main__":
     # 输入路径配置
     # 控制台运行程序
     instructions_path = "./config/instructions.json"
-    apis_path = "./config/apis.json"
+    apis_path = "./config/api_template.json"
     players_info_path = "./config/player_info.json"
     game_name = input("请输入游戏名称：")
     mode = input("请输入游戏模式（1、全自动模式，2、手动模式）：")
 
-    game = Game(game_name,players_info_path,apis_path,instructions_path)
+    game = Game(game_name, players_info_path, apis_path, instructions_path)
     
     if mode == "2":
         # 增加手动控制游戏逻辑
         # 手动控制游戏进程
-        print("\n游戏开始! 输入命令控制游戏进程:")
-        print("1: 进入下一天/夜")
-        print("2: 狼人杀人阶段") 
-        print("3: 预言家查验阶段")
-        print("4: 女巫操作阶段")
-        print("5: 公共讨论阶段")
-        print("6: 投票阶段")
-        print("7: 查看当前游戏状态")
-        print("8: 结束游戏")
         
         while True:
+            print("\n————————————————————")
+            print("游戏开始! 输入命令控制游戏进程:")
+            print("1: 进入下一夜")
+            print("2: 狼人杀人阶段") 
+            print("3: 预言家查验阶段")
+            print("4: 女巫操作阶段")
+            print("5: 公共讨论阶段")
+            print("6: 投票阶段")
+            print("7: 查看当前游戏状态")
+            print("8: 结束游戏")
+            print("————————————————————")
             cmd = input("\n请输入命令(1-8): ")
             
             if cmd == "1":
-                # 进入下一天/夜
+                # 进入下一夜
                 game.day_night_change()
                 print(f"已进入: 第{game.get_game_stage()[0]}天{'白天' if game.get_game_stage()[1] else '晚上'}")
             elif cmd == "2":
@@ -910,6 +867,8 @@ if __name__ == "__main__":
                 game.witch_operation()
                 print("女巫操作阶段结束")
             elif cmd == "5":
+                game.day_night_change()
+                print(f"已进入: 第{game.get_game_stage()[0]}天{'白天' if game.get_game_stage()[1] else '晚上'}")
                 # 公共讨论
                 game.public_discussion()
                 print("公共讨论阶段结束")

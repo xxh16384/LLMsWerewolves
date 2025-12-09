@@ -1,5 +1,4 @@
-/config/apis.json
 /__pycache__
 test.py
-LLMsWerewolves.code-workspace
 /log
+config/api_template.json
