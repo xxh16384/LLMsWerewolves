@@ -6,6 +6,7 @@ from time import time
 from core.tools import read_json, extract_numbers_from_brackets, find_max_key
 from .context import Context
 from .player import Player
+from core.general import *
 
 
 
@@ -44,6 +45,7 @@ class Game:
         self.players = []
         self.init_game()
         self.kill_tonight = []
+
 
     def set_logger(self):
         """
@@ -92,6 +94,7 @@ class Game:
 
         self.logger = logger
 
+
     def init_game(self):
         """
         Initializes the game by creating player instances and setting up the initial context.
@@ -113,6 +116,7 @@ class Game:
         for i in self.players:
             i.init_system_prompt()
         Context(self,0,self.players_info["0"],self.get_players(t="id",alive=False))
+
 
     def get_players(self,t = "object",alive = True , role = "all"):
         """
@@ -153,6 +157,7 @@ class Game:
                 elif t == "id":
                     return [i.id for i in self.players if i.role == role]
 
+
     def get_players_by_ids(self,ids:list):
         """
         Returns a list of players according to given ids.
@@ -166,6 +171,7 @@ class Game:
         ids = [int(i) for i in ids]
         players_pending = [i for i in self.players if i.id in ids]
         return players_pending
+
 
     def werewolf_killing(self):
         """
@@ -207,6 +213,7 @@ class Game:
         else:
             Context(self,0,f"击杀失败",self.get_players(t="id",role="werewolf",alive=False))
 
+
     def seer_seeing(self):
         """
         Now it's the seer's turn to see someone's role.
@@ -228,6 +235,7 @@ class Game:
         seer.private_chat(0,"你今晚要查谁？要查询的玩家编号请用[]包围，例如'我要查询[7]号玩家'。可以简短的给出理由。")
         target = extract_numbers_from_brackets(seer.messages[-1]['content'])
         seer.private_chat(0,f"你今晚要查的玩家是{self.get_players_by_ids(target)[0]}，他的身份是{self.get_players_by_ids(target)[0].role}")
+
 
     def witch_operation(self):
         """
@@ -293,6 +301,7 @@ class Game:
             else:
                 pass
 
+
     def public_discussion(self):
         """
         Public discussion process. Sends a message to all players to discuss,
@@ -306,6 +315,7 @@ class Game:
         Context(self,0,content,self.get_players(t="id",alive=False))
         for i in players_pending:
             i.pub_chat(0,content,add_to_context=False)
+
 
     def vote(self) -> dict:
         """
@@ -329,6 +339,7 @@ class Game:
                             result[int(voted[-1])] += 1
         return result
 
+
     def game_over(self) -> int:
         """
         Determines if the game is over and declares the winner.
@@ -350,6 +361,7 @@ class Game:
         else:
             return 0
 
+
     def get_winner(self) -> str:
         if self.game_over():
             if len(self.get_players(alive=True)) - 2*len(self.get_players(alive=True,role="werewolf")) < 0:
@@ -358,6 +370,7 @@ class Game:
             elif len(self.get_players(alive=True,role="werewolf")) == 0:
                 Context(self,0,f"游戏结束，好人获胜",self.get_players(t="id",alive=False))
                 return "好人"
+
 
     def private_chat(self,player_id:int,content:str):
         """
@@ -368,6 +381,7 @@ class Game:
             content (str): The content of the chat message to be sent.
         """
         self.get_players_by_ids([player_id])[0].private_chat(0,content)
+
 
     def public_chat(self,player_id:int,content:str,add_to_context:bool=True):
         """
@@ -380,6 +394,7 @@ class Game:
 
         self.get_players_by_ids([player_id])[0].pub_chat(0,content,add_to_context)
 
+
     def broadcast(self,content):
         """
         Broadcast a message to all players.
@@ -388,6 +403,7 @@ class Game:
             content (str): content of the message to be broadcasted
         """
         Context(self,0,content,self.get_players(t="id",alive=False))
+
 
     def out(self,player_ids:list):
         """
@@ -408,6 +424,7 @@ class Game:
             i.alive = False
         self.broadcast(f"{str(player_ids)[1:-1]}号玩家出局")
 
+
     def no_out(self,player_ids:list):
         """
         to no out players, given player_ids list.
@@ -425,6 +442,7 @@ class Game:
         for i in players_pending:
             i.alive = True
         self.broadcast(f"{str(player_ids)[1:-1]}号玩家加入")
+
 
     def day_night_change(self):
         """
@@ -449,6 +467,7 @@ class Game:
             else:
                 self.broadcast(f"昨晚是个平安夜，没有人被杀")
 
+
     def get_game_stage(self):
         """
         Returns the current game stage as a tuple of two integers.
@@ -471,13 +490,16 @@ class Game:
         """
         days = self.stage//2 + 1
         morning_dusk = (self.stage + 1) % 2 # 1表示白天，0表示晚上
-        return days,morning_dusk
+        return days, morning_dusk
+
 
     def __hash__(self):
         return hash(self.id)
 
+
     def __str__(self):
-        return f"{self.game_name}：第{self.get_game_stage()[0]}天{'白天' if self.get_game_stage()[1] else '晚上'}"
+        return f"第{self.get_game_stage()[0]}天{TIMEDIC[self.get_game_stage()[1]]}"
+
 
     def __eq__(self, value):
         return self.id == value.id

@@ -1,6 +1,7 @@
 import re
 
 
+
 class Context:
     contexts = {}
     def __init__(self,game,source_id,content,visible_ids = [],is_streaming = False, last_block = False):

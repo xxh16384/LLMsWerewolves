@@ -1,6 +1,7 @@
 import json
 
 
+
 def read_json(file_path):
     """
     读取一个json文件
@@ -13,6 +14,7 @@ def read_json(file_path):
     """
     with open(file_path,"r",encoding="UTF-8") as f:
         return json.load(f)
+
 
 def extract_numbers_from_brackets(text):
     """
@@ -47,6 +49,7 @@ def extract_numbers_from_brackets(text):
         start = text.find('[', end)
 
     return numbers
+
 
 def find_max_key(vote_dict):
     """

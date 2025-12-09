@@ -1,5 +1,6 @@
 from time import sleep
 from .context import Context
+from core.general import *
 
 
 
@@ -38,6 +39,7 @@ class Player:
             self.antidote = False
         game.players.append(self)
 
+
     def init_system_prompt(self):
         """
         Initializes the system prompt for a player based on their role and game context.
@@ -63,6 +65,7 @@ class Player:
             wolfs = self.game.get_players("id",alive=False,role="werewolf")
             pre_instruction += f"\n以下玩家是狼人{str(wolfs)[1:-1]}，是你和你的队友"
         self.messages.append({"role":"system","content":pre_instruction})
+
 
     def get_response(self,prompt,if_pub):
         """
@@ -153,6 +156,7 @@ class Player:
 
         self.messages.append({"role":"assistant","content":collected_messages})
 
+
     def private_chat(self,source_id,content):
         """
         Allows a player to send a private chat message to another player.
@@ -172,6 +176,7 @@ class Player:
             if not self.game.webui_mode:
                 print(f"{source_id}号玩家：{content}")
             self.get_response(f"{source_id}号玩家：{content}",False)
+
 
     def pub_chat(self,source_id,content,add_to_context = True):
         """
@@ -194,5 +199,6 @@ class Player:
         if add_to_context:
             Context(self.game,source_id,content,self.game.get_player(t="id",alive=False))
 
+
     def __str__(self):
-        return f"玩家{self.id}（{self.role}）"
+        return f"玩家{self.id}（{PLAYERDIC[self.role]}）"

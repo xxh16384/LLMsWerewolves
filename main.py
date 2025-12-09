@@ -1,9 +1,13 @@
 from core.tools import find_max_key
 from core.game import Game
+from core.general import *
+
+
 
 if __name__ == "__main__":
     # 输入路径配置
     # 控制台运行程序
+    
     instructions_path = "./config/instructions.json"
     apis_path = "./config/api_template.json"
     players_info_path = "./config/player_info.json"
@@ -15,24 +19,24 @@ if __name__ == "__main__":
     if mode == "2":
         
         while True:
-            print("\n————————————————————")
-            print("游戏开始! 请按顺序输入命令控制游戏进程:")
-            print("1: 进入下一夜")
-            print("2: 狼人杀人阶段") 
-            print("3: 预言家查验阶段")
-            print("4: 女巫操作阶段")
-            print("5: 公共讨论阶段")
-            print("6: 投票阶段")
-            print("7: 查看当前游戏状态")
-            print("8: 结束游戏")
-            print("————————————————————\n")
+            print("\n ————————————————————\
+                   \n 游戏开始! 请按顺序输入命令控制游戏进程:\
+                   \n 1: 进入下一夜\
+                   \n 2: 狼人杀人阶段\
+                   \n 3: 预言家查验阶段\
+                   \n 4: 女巫操作阶段\
+                   \n 5: 公共讨论阶段\
+                   \n 6: 投票阶段\
+                   \n 7: 查看当前游戏状态\
+                   \n 8: 结束游戏\
+                   \n ————————————————————\n")
+            print(f"【当前时间：{game}】\n")
             cmd = input("请输入命令(1-8): ")
             
             match(cmd):
                 case "1":
                     # 进入下一夜
                     game.day_night_change()
-                    print(f"已进入: 第{game.get_game_stage()[0]}天{'白天' if game.get_game_stage()[1] else '晚上'}")
                 case "2":
                     # 狼人杀人
                     game.werewolf_killing()
@@ -47,7 +51,7 @@ if __name__ == "__main__":
                     print("女巫操作阶段结束")
                 case "5":
                     game.day_night_change()
-                    print(f"已进入: 第{game.get_game_stage()[0]}天{'白天' if game.get_game_stage()[1] else '晚上'}")
+                    print(f"已进入: 第{game.get_game_stage()[0]}天{TIMEDIC[game.get_game_stage()[1]]}")
                     # 公共讨论
                     game.public_discussion()
                     print("公共讨论阶段结束")
@@ -58,12 +62,13 @@ if __name__ == "__main__":
                     print("投票阶段结束")
                 case "7":
                     # 显示当前状态
-                    print(f"\n当前游戏状态:")
-                    print(f"游戏名称: {game.game_name}")
-                    print(f"游戏阶段: 第{game.get_game_stage()[0]}天{'白天' if game.get_game_stage()[1] else '晚上'}")
-                    print("\n存活玩家:")
+                    print(f"\n ————————————————————\
+                            \n 当前游戏状态:\
+                            \n 游戏名称: {game.game_name}\
+                            \n 游戏阶段: 第{game.get_game_stage()[0]}天{TIMEDIC[game.get_game_stage()[1]]}\
+                            \n 存活玩家:")
                     for player in game.get_players(alive=True):
-                        print(f"玩家{player.id}({player.role})")
+                        print(f" {player}")
                 case "8":
                     # 结束游戏
                     print("游戏已手动结束")
