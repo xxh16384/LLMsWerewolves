@@ -1,7 +1,7 @@
 {
     "Model abbreviation":{
-        "api_key":"",
-        "base_url":"",
-        "model_name":""
+        "api_key":"AIzaSyB8eGHOvV-QlFzAT-VnHKa8MhQuR7UXKPg",
+        "base_url":"https://generativelanguage.googleapis.com/v1beta/openai/",
+        "model_name":"gemini-2.5-flash"
     }
 }
