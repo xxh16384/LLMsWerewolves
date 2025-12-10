@@ -575,6 +575,35 @@ def format_log_message(context, game):
 </div>"""
 
 
+# 新增函数：执行游戏阶段并处理狼人自爆
+def auto_game_phase(game, phase_name):
+    """执行游戏的一个阶段，并处理可能的狼人自爆
+    
+    Args:
+        game: 游戏对象
+        phase_name: 阶段名称
+        
+    Returns:
+        bool: 如果有狼人自爆返回True，否则返回False
+    """
+    if phase_name == "狼人杀人":
+        game.werewolf_killing()
+    elif phase_name == "预言家查验":
+        game.seer_seeing()
+    elif phase_name == "女巫操作":
+        game.witch_operation()
+    elif phase_name == "公共讨论":
+        # 检查是否有狼人自爆
+        werewolf_exploded = game.public_discussion()
+        return werewolf_exploded  # 如果有狼人自爆，返回True
+    elif phase_name == "投票出局":
+        # 检查是否有狼人自爆
+        result = game.vote()
+        if result is None:  # 有狼人自爆
+            return True
+        game.out([find_max_key(result)])
+    return False  # 默认返回False表示正常完成阶段
+
 def auto_game_page():
 
     st.set_page_config(page_title="狼人杀😋", page_icon="🐺", layout="wide", initial_sidebar_state="collapsed", menu_items={"About":"https://github.com/xxh16384/LLMsWerewolves"})

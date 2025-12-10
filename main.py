@@ -47,7 +47,7 @@ def extract_numbers_from_brackets(text):
         else:
             print("找到了'['但没有对应的']'")
             break
-        
+
         # 继续查找下一个"["
         start = text.find('[', end)
 
@@ -680,36 +680,50 @@ class Game:
         """
         Public discussion process. Sends a message to all players to discuss,
         then collects all the discussion content and shows it to all players.
+        If a werewolf decides to explode during discussion, they will be eliminated
+        and the day phase will end immediately.
 
         Returns:
-            None
+            bool: True if a werewolf exploded, False otherwise
         """
         players_pending = self.get_players()
-        content = "请公开讨论，在此阶段你可以简短发言，解释讨论理由。"
+        content = "请公开讨论，在此阶段你可以简短发言，解释讨论理由。如果你是狼人，可以通过在发言中包含[自爆]来结束白天。"
         Context(self,0,content,self.get_players(t="id",alive=False))
         for i in players_pending:
             i.pub_chat(0,content,add_to_context=False)
+            # 检查是否有狼人自爆
+            if "[自爆]" in i.messages[-1]['content'] and i.role == "werewolf":
+                self.broadcast(f"{i.id}号玩家狼人自爆！")
+                self.out([i.id])
+                return True
+        return False
 
     def vote(self) -> dict:
         """
         Voting process. First, sends a message to all players to vote. Then,
         collects all the votes and returns a dictionary where the keys are the
         player ids and the values are the number of votes they got.
+        If a werewolf decides to explode during voting, they will be eliminated
+        and the day phase will end immediately.
 
         Returns:
             dict: A dictionary where the keys are the player ids and the values
-                are the number of votes they got.
+                are the number of votes they got. Returns None if a werewolf exploded.
         """
         players_pending = self.get_players()
-        content = "请投票，投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以简短发言，解释投票理由。"
+        content = "请投票，投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以简短发言，解释投票理由。如果你是狼人，可以通过在发言中包含[自爆]来结束白天。"
         Context(self,0,content,self.get_players(t="id",alive=False))
-        for i in players_pending:
-            i.pub_chat(0,content,add_to_context=False)
         result = {i.id:0 for i in players_pending}
         for i in players_pending:
+            i.pub_chat(0,content,add_to_context=False)
+            # 检查是否有狼人自爆
+            if "[自爆]" in i.messages[-1]['content'] and i.role == "werewolf":
+                self.broadcast(f"{i.id}号玩家狼人自爆！")
+                self.out([i.id])
+                return None
             voted = extract_numbers_from_brackets(i.messages[-1]['content'])
             if voted and int(voted[-1]) in self.get_players("id"):
-                            result[int(voted[-1])] += 1
+                result[int(voted[-1])] += 1
         return result
 
     def game_over(self) -> int:
@@ -940,6 +954,7 @@ if __name__ == "__main__":
     elif mode == "1":
         # 全自动模式
         print("\n游戏开始! 自动控制游戏进程:")
+        # 在全自动模式中
         while not game.game_over():
             game.day_night_change()
             game.werewolf_killing()
@@ -949,8 +964,13 @@ if __name__ == "__main__":
             if game.game_over():
                 game.get_winner()
                 break
-            game.public_discussion()
-            result = find_max_key(game.vote())
-            game.out([result])
+            # 检查公共讨论阶段是否有自爆
+            if game.public_discussion():
+                continue  # 如果有自爆，直接进入下一个循环（夜晚）
+            # 检查投票阶段是否有自爆
+            result = game.vote()
+            if result is None:  # 有自爆发生
+                continue
+            game.out([find_max_key(result)])
     else:
         print("无效的命令，进程自动退出...")
