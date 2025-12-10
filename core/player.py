@@ -1,100 +1,92 @@
 from time import sleep
 from .context import Context
 from core.general import *
-from openai import OpenAI
 
 
 class Player:
     def __init__(self, role: str, id: int, using_preset: str, game):
+        """初始化一个玩家实例。
+
+        Args:
+            role (str): 分配给玩家的角色，如 'werewolf', 'villager' 等。
+            id (int): 玩家的唯一数字标识。
+            using_preset (str): 玩家使用的预设配置名称，用于查找API信息。
+            game (Game): 玩家所属的游戏实例。
         """
-        使用给定的模型、角色、ID和游戏上下文初始化Player实例。
-
-        参数:
-            model (str): 用于玩家的模型标识符，对应API配置。
-            role (str): 分配给玩家的游戏角色（例如，狼人、村民、女巫）。
-            id (int): 玩家的唯一标识符。
-            game: 玩家参与的游戏上下文。
-
-        属性:
-            game: 初始化期间传递的游戏上下文。
-            client: 使用玩家模型配置的OpenAI客户端实例。
-            role (str): 玩家在游戏中的角色。
-            id (int): 玩家的唯一标识符。
-            model (str): 用于玩家的模型标识符。
-            alive (bool): 标志玩家当前是否存活（默认为True）。
-            messages (list): 与玩家关联的消息列表。
-            poison (bool): 标志女巫角色是否有毒药可用（默认为False）。
-            antidote (bool): 标志女巫角色是否有解药可用（默认为False）。
-        """
-
         self.game = game
-
         self.using_preset = using_preset
-
-        self.client = OpenAI(
-            api_key=game.apis[self.using_preset]["api_key"],
-            base_url=game.apis[self.using_preset]["base_url"],
-        )
-        # self.client = game.client
+        self.client = game.clients[self.using_preset]
         self.role = role
         self.id = id
         self.alive = True
-
-        self.recognition = ""  # 当前是第几天的什么阶段
-
+        self.recognition = ""
         self.messages = []
         self.init_role_special()
         game.players.append(self)
 
-    def init_role_special(self):
-        if self.role == "witch":
-            self.poison = True
-            self.antidote = True
-
     def init_system_prompt(self):
+        """根据玩家的角色和游戏设置，初始化系统提示信息。
+
+        此方法为大型语言模型构建一条初始指令，告知其扮演的角色、身份号码
+        以及游戏规则。对于特殊角色（如狼人），还会提供额外信息（如队友号码）。
+        生成的提示信息会作为第一条系统消息存入玩家的消息列表。
         """
-        基于玩家角色和游戏上下文初始化系统提示。
-
-        此方法为玩家构建预指令消息，指示他们在游戏中的角色以及与其角色相关的任何相关信息。
-        如果玩家的角色是"werewolf"(狼人)，则会包含其他狼人玩家的额外信息。
-
-        构建的消息作为系统消息追加到玩家的消息列表中。
-
-        副作用:
-            使用包含角色特定指令和信息的新系统消息更新玩家的消息列表。
-
-        属性:
-            pre_instruction (str): 为玩家构建的指令消息。
-            wolfs (list): 非存活的狼人玩家列表，用于为"werewolf"(狼人)角色的玩家提供额外信息。
-        """
-
         pre_instruction = f"你是{self.id}号玩家，" + self.game.instructions[self.role]
         if self.role == "werewolf":
             wolfs = self.game.get_players("id", alive=False, role="werewolf")
             pre_instruction += f"\n以下玩家是狼人{str(wolfs)[1:-1]}，是你和你的队友"
         self.messages.append({"role": "system", "content": pre_instruction})
 
-    def get_response(self, prompt, if_pub):
+    def pub_chat(self, source_id: int, content: str):
+        """处理并响应一则公共聊天消息。
+
+        此方法用于玩家在公共频道发言。它会将发言内容和来源信息
+        传递给核心的响应生成函数，并设定为公开模式。
+
+        Args:
+            source_id (int): 发言者的ID。如果为0，代表是系统（上帝）发言。
+            content (str): 发言的具体内容。
         """
-        在给定提示和响应是否应公开的情况下，模拟与玩家的对话。
+        Context(
+            self.game, source_id, content, self.game.get_players(t="id", alive=False)
+        )
+        if source_id == 0:
+            self.get_response(f"上帝：{content}", True)
+        else:
+            self.get_response(f"{source_id}号玩家：{content}", True)
 
-        此方法用于在游戏的夜晚和白天阶段都获得玩家的响应。
-        当响应应该公开时，在要求玩家回应之前，会向玩家显示所有公开可用的消息。
-        当响应不应该公开时，会向玩家显示他们能看到的所有消息，但他们的响应不会与其他玩家共享。
+    def private_chat(self, source_id: int, content: str):
+        """处理并响应一则私人聊天消息。
 
-        玩家的响应作为新消息追加到游戏上下文中，并且此方法也会返回该响应。
+        此方法用于玩家接收并回应一则私密消息（通常来自系统）。
+        它会将消息内容和来源信息传递给核心的响应生成函数，并设定为私密模式。
 
-        参数:
-            prompt (str): 给玩家的提示，用作AI模型的输入。
-            if_pub (bool): 响应是否应该公开(True)或私密(False)。
-
-        返回:
-            str: 玩家对提示的响应。
-
-        副作用:
-            玩家的响应作为新消息追加到游戏上下文中。
+        Args:
+            source_id (int): 消息来源的ID。通常为0，代表系统（上帝）。
+            content (str): 消息的具体内容。
         """
+        if source_id == 0:
+            Context(self.game, 0, f"{content}", [self.id])
+            self.get_response(f"上帝：{content}", False)
+        else:
+            Context(self.game, source_id, f"{content}", [self.id])
+            if not self.game.webui_mode:
+                print(f"{source_id}号玩家：{content}")
+            self.get_response(f"{source_id}号玩家：{content}", False)
 
+    def get_response(self, prompt: str, if_pub: bool):
+        """根据提示生成并处理玩家的响应。
+
+        此函数是玩家与AI模型交互的核心。它会整合历史消息和当前提示，
+        构建完整的上下文，然后调用AI模型的API来获取响应。函数还能处理
+        流式输出和特殊的思考过程（<think>标签）。最终，生成的响应会被
+        记录到游戏上下文中。
+
+        Args:
+            prompt (str): 对玩家的当前提示或问题。
+            if_pub (bool): 一个布尔值，指示当前是否为公共发言阶段。
+                True表示公共，False表示私聊。
+        """
         sleep(1)
 
         visible_ids = (
@@ -130,10 +122,9 @@ class Player:
         )
         self.messages[-1]["content"] = prompt0
 
-        # 处理回复
         collected_messages = ""
         reasoning_messages = ""
-        reasoning_model = -1  # 判断是否是推理模型，-1待判断，0不是，1是
+        reasoning_model = -1
         print(f"玩家{self.id}（{self.role}）： ", end="", flush=True)
         for chunk in response:
             if reasoning_model == -1:
@@ -169,7 +160,6 @@ class Player:
                 print(chunk_message, end="", flush=True)
 
         print("")
-        # 加入公共上下文
         collected_messages = (
             "<think>" + reasoning_messages + "</think>" + collected_messages
             if reasoning_messages
@@ -179,46 +169,21 @@ class Player:
 
         self.messages.append({"role": "assistant", "content": collected_messages})
 
-    def private_chat(self, source_id, content):
+    def init_role_special(self):
+        """根据角色初始化特殊属性。
+
+        这是一个辅助函数，在玩家对象初始化时被调用。
+        它会检查玩家的角色，并根据角色赋予其特殊的初始状态。
+        例如，为'女巫'角色设置毒药和解药的初始拥有状态。
         """
-        允许玩家向另一个玩家发送私人聊天消息。
+        if self.role == "witch":
+            self.poison = True
+            self.antidote = True
 
-        参数:
-            source_id (int): 发送消息的玩家ID。
-            content (str): 要发送的聊天消息内容。
+    def __str__(self) -> str:
+        """返回玩家对象的字符串表示形式。
+
+        Returns:
+            str: 一个描述玩家ID和角色的字符串，例如 "玩家5（女巫）"。
         """
-
-        if source_id == 0:
-            Context(self.game, 0, f"{content}", [self.id])
-            # if not self.game.webui_mode:
-            #     print(f"上帝：{content}")
-            self.get_response(f"上帝：{content}", False)
-        else:
-            Context(self.game, source_id, f"{content}", [self.id])
-            if not self.game.webui_mode:
-                print(f"{source_id}号玩家：{content}")
-            self.get_response(f"{source_id}号玩家：{content}", False)
-
-    def pub_chat(self, source_id, content):
-        """
-        处理游戏上下文中的公共聊天消息。
-
-        此方法允许玩家或系统（由source_id = 0表示）向所有玩家发送公共聊天消息。
-        消息被处理并公开显示，让所有玩家都能看到互动。
-
-        参数:
-            source_id (int): 发送消息的玩家或系统的ID。
-                            如果为0，则消息来自系统("上帝")。
-            content (str): 要公开发送的消息内容。
-        """
-
-        Context(
-            self.game, source_id, content, self.game.get_player(t="id", alive=False)
-        )
-        if source_id == 0:
-            self.get_response(f"上帝：{content}", True)
-        else:
-            self.get_response(f"{source_id}号玩家：{content}", True)
-
-    def __str__(self):
         return f"玩家{self.id}（{PLAYERDIC[self.role]}）"

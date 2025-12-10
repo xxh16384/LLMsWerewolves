@@ -6,23 +6,26 @@ from .tools import read_json, extract_numbers_from_brackets, find_max_key, makeD
 from .context import Context
 from .player import Player
 from .general import *
+from openai import OpenAI
 
 
 class Game:
     def __init__(
-        self, game_name, players_info_path, apis_path, instructions_path, roles
+        self,
+        game_name: str,
+        players_info_path: str,
+        apis_path: str,
+        instructions_path: str,
+        roles: dict,
     ):
-        """
-        初始化游戏对象
+        """初始化一个狼人杀游戏实例。
 
-        参数:
-            game_name (str): 游戏名称
-            players_info_path (str): 玩家信息文件路径
-            apis_path (str): API配置文件路径
-            instructions_path (str): 游戏指令文件路径
-
-        返回值:
-            无
+        Args:
+            game_name (str): 游戏名称。
+            players_info_path (str): 包含玩家信息的JSON文件路径。
+            apis_path (str): 包含API配置的JSON文件路径。
+            instructions_path (str): 包含游戏指令的JSON文件路径。
+            roles (dict): 一个包含角色及其数量的字典。
         """
         self.game_name = game_name
         self.stage = 0
@@ -33,160 +36,56 @@ class Game:
         self.apis = read_json(apis_path)
         self.players_info = read_json(players_info_path)
 
-        # self.client = OpenAI(
-        #     api_key=self.apis["Model abbreviation"]["api_key"],
-        #     base_url=self.apis["Model abbreviation"]["base_url"],
-        # )
+        self.clients = {}
 
         self.players = []
         self.roles = roles.copy()
+        counts = sum([num for num in self.roles.values()])
 
         self.role_prompts = f"\
-            这是一局有{len(self.roles)}个玩家的狼人杀游戏，\
-                一共有  {self.roles["werewolf"] + "个狼人，" if self.roles["werewolf"] > 0 else ""}\
-                        {self.roles["villager"] + "个村民，" if self.roles["villager"] > 0 else ""}\
-                        {self.roles["seer"] + "个预言家，" if self.roles["seer"] > 0 else ""}\
-                        {self.roles["witch"] + "个女巫，" if self.roles["witch"] > 0 else ""}\
-                        {self.roles["guard"] + "个守卫，" if self.roles["guard"] > 0 else ""}"
+这是一局有{counts}个玩家的狼人杀游戏，一共有\
+{str(self.roles["werewolf"]) + "个狼人，" if self.roles["werewolf"] > 0 else ""}\
+{str(self.roles["villager"]) + "个村民，" if self.roles["villager"] > 0 else ""}\
+{str(self.roles["seer"]) + "个预言家，" if self.roles["seer"] > 0 else ""}\
+{str(self.roles["witch"]) + "个女巫，" if self.roles["witch"] > 0 else ""}\
+{str(self.roles["guard"]) + "个守卫，" if self.roles["guard"] > 0 else ""}"
 
         self.init_game()
 
         self.kill_tonight = []
         self.guard_tonight = []
 
-    def set_logger(self):
+    def day_night_change(self):
+        """处理昼夜交替，推进游戏阶段。
+
+        此方法会增加游戏阶段计数器，并根据阶段判断是白天还是黑夜。
+        在第二天及以后的早晨，它会公布前一晚的死讯，更新玩家状态，
+        并重置当晚的守护和死亡列表。
         """
-        设置日志记录器
-
-        该函数负责创建日志目录、配置日志基本信息、创建日志记录器实例，
-        并将日志记录器保存到实例变量中。
-
-        参数:
-            无
-
-        返回值:
-            无返回值
-
-        功能说明:
-            1. 检查并创建日志目录
-            2. 配置日志基本设置，包括日志级别、格式、输出文件等
-            3. 创建指定ID的日志记录器
-            4. 输出一条测试性的调试日志
-            5. 将日志记录器保存到实例变量中供后续使用
-        """
-        # 创建文件处理器 (File Handler)
-        if not os.path.exists("./log"):
-            os.mkdir("./log")
-
-        logging.basicConfig(
-            level=logging.DEBUG,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            filename=f"./log/{self.game_name}-id={self.id}.md",
-            encoding="UTF-8",
-        )
-
-        logger = logging.getLogger(str(self.id))
-
-        logger.debug("这是一条调试信息")
-
-        self.logger = logger
-
-    def init_game(self):
-        """
-        初始化游戏对象
-
-        该函数完成以下初始化工作：
-        1. 根据玩家信息创建除主持人外的所有玩家对象
-        2. 初始化所有玩家的系统提示信息
-        3. 创建游戏上下文环境
-
-        参数:
-            无
-
-        返回值:
-            无
-        """
-        for i in self.players_info.keys():
-            if i == "0" or i == 0:
-                continue
-            # roles = self.players_info[i]["role"]
-            role = self.give_role()
-            preset = self.players_info[i]["preset"]
-            Player(role, int(i), preset, self)
-        for i in self.players:
-            i.init_system_prompt()
-        # Context(self, 0, self.players_info["0"], self.get_players(t="id", alive=False))
-        Context(self, 0, self.role_prompts, self.get_players(t="id", alive=False))
-
-    def get_players(self, t="object", alive=True, role="all"):
-        """
-        获取符合条件的玩家列表
-
-        参数:
-            t (str): 返回数据类型，"object"返回玩家对象列表，"id"返回玩家ID列表，默认为"object"
-            alive (bool): 是否只返回存活的玩家，True表示只返回存活玩家，False表示返回所有玩家，默认为True
-            role (str): 玩家角色筛选条件，"all"表示不限制角色，其他值表示指定特定角色，默认为"all"
-
-        返回:
-            list: 根据参数条件筛选后的玩家列表，列表元素类型由参数t决定
-        """
-        if role == "all":
-            if alive:
-                if t == "object":
-                    return [i for i in self.players if i.alive]
-                elif t == "id":
-                    return [i.id for i in self.players if i.alive]
+        self.stage += 1
+        days, morning_dusk = self.get_game_stage()
+        self.guard_tonight = []
+        if morning_dusk == 1 and days > 1:
+            if self.kill_tonight:
+                self.kill_tonight = list(set(self.kill_tonight))
+                self.broadcast(f"昨晚{str(self.kill_tonight)[1:-1]}号玩家被杀了")
+                self.out(self.kill_tonight)
+                self.kill_tonight = []
             else:
-                if t == "object":
-                    return self.players
-                elif t == "id":
-                    return [i.id for i in self.players]
-        else:
-            if alive:
-                if t == "object":
-                    return [i for i in self.players if i.role == role and i.alive]
-                elif t == "id":
-                    return [i.id for i in self.players if i.role == role and i.alive]
-            else:
-                if t == "object":
-                    return [i for i in self.players if i.role == role]
-                elif t == "id":
-                    return [i.id for i in self.players if i.role == role]
-
-    def get_players_by_ids(self, ids: list):
-        """
-        根据玩家ID列表获取对应的玩家对象列表
-
-        参数:
-            ids (list): 包含玩家ID的列表，ID可以是字符串或数字类型
-
-        返回:
-            list: 包含匹配的Player对象的列表，如果找不到对应ID的玩家则返回空列表
-        """
-        ids = [int(i) for i in ids]
-        players_pending = [i for i in self.players if i.id in ids]
-        return players_pending
+                self.broadcast(f"昨晚是个平安夜，没有人被杀")
 
     def guard_guarding(self):
-        """
-        处理守卫角色的保护行动
+        """处理守卫的夜晚守护行动。
 
-        该函数负责与守卫玩家交互，获取其保护目标，并记录相关上下文信息。
-        守卫可以在夜间选择保护一名玩家，或者选择不保护任何人。
-
-        参数:
-            无
-
-        返回值:
-            无
+        该函数会与守卫玩家进行私聊，询问其当晚要守护的目标。
+        获取目标后，将守护信息记录到守卫的上下文中，并更新当晚的守护列表。
+        如果游戏中没有守卫角色，则直接返回。
         """
 
         def talk_guard(message: str):
-            # 通知守卫消息
             guard.private_chat(0, message)
 
         def record_guard(message: str):
-            # 将消息加入守卫的上下文
             Context(self, 0, message, self.get_players(t="id", role="guard"))
 
         guard = self.get_players(role="guard")
@@ -198,34 +97,22 @@ class Game:
             "你今晚要保护谁？要保护的玩家编号请用[]包围，若不保护人则输出[0]，例如'我要保护[7]号玩家'或'我不想保护人，[0]'。可以简短的给出理由。"
         )
         target = extract_numbers_from_brackets(guard.messages[-1]["content"])
-        if target and target != 0:
-            record_guard(
-                f"在{self.get_day}的晚上，你保护了玩家{self.get_players_by_ids(target)[0]}。"
-            )
-        self.guard_tonight.append(target)
+        if target and target[0] != 0:
+            record_guard(f"在{self.get_day()}的晚上，你保护了{target}号玩家。")
+        self.guard_tonight.append(target[0])
 
     def werewolf_killing(self):
-        """
-        狼人杀人阶段的主要逻辑函数
+        """处理狼人团队的夜晚杀人行动。
 
-        该函数处理狼人讨论和投票杀人的完整流程，包括：
-        1. 通知所有狼人进行讨论
-        2. 收集狼人的杀人投票
-        3. 统计投票结果并确定被杀目标
-        4. 记录杀人意图到游戏上下文
-
-        参数:
-            无
-
-        返回值:
-            无返回值
+        此函数协调狼人阵营的内部讨论和投票，以决定当晚要淘汰的玩家。
+        它会收集所有狼人的投票，找出得票最多的目标，并将其记录到当晚的死亡候选列表中。
+        如果目标未被守卫守护，则会最终被标记为死亡。
         """
 
-        def talk_werewolf(target, message: str):
+        def talk_werewolf(target: Player, message: str):
             target.private_chat(0, message)
 
         def record_werewolf(message: str):
-            # 将消息加入预言家的上下文
             Context(self, 0, message, self.get_players(t="id", role="werewolf"))
 
         wolves = self.get_players(role="werewolf")
@@ -251,35 +138,24 @@ class Game:
 
         killed = find_max_key(result)
         if killed and killed != 0:
-            record_werewolf(f"在{self.get_day}的晚上，{killed}号玩家被狼人标记要杀。")
+            record_werewolf(f"在{self.get_day()}的晚上，{killed}号玩家被狼人标记要杀。")
             if not killed in self.guard_tonight:
                 self.kill_tonight.append(killed)
         else:
-            record_werewolf(f"在{self.get_day}的晚上，狼人没有选择任何人要杀。")
+            record_werewolf(f"在{self.get_day()}的晚上，狼人没有选择任何人要杀。")
 
     def seer_seeing(self):
-        """
-        处理预言家夜晚查验身份的逻辑流程
+        """处理预言家的夜晚查验行动。
 
-        该函数负责：
-        1. 获取当前存活的预言家玩家
-        2. 向预言家发送查验指令消息
-        3. 解析预言家的选择结果
-        4. 记录查验结果到游戏上下文
-
-        参数:
-            无
-
-        返回值:
-            无
+        该函数与预言家玩家进行私聊，询问其要查验身份的目标玩家。
+        获取目标后，它会查询该玩家的真实身份，并将结果反馈给预言家。
+        如果游戏中没有预言家角色，则直接返回。
         """
 
         def talk_seer(message: str):
-            # 通知预言家消息
             seer.private_chat(0, message)
 
         def record_seer(message: str):
-            # 将消息加入预言家的上下文
             Context(self, 0, message, self.get_players(t="id", role="seer"))
 
         seer = self.get_players(role="seer")
@@ -291,32 +167,21 @@ class Game:
         )
         target = extract_numbers_from_brackets(seer.messages[-1]["content"])
         record_seer(
-            f"在{self.get_day}的晚上，你查的玩家是{self.get_players_by_ids(target)[0]}，他的身份是{self.get_players_by_ids(target)[0].role}。"
+            f"在{self.get_day()}的晚上，你查的玩家是{target}号，他的身份是{self.get_players_by_ids(target)[0].role}。"
         )
 
     def witch_operation(self):
-        """
-        执行女巫角色的操作逻辑。
+        """处理女巫的夜晚操作，包括使用解药和毒药。
 
-        女巫每晚可以执行两个操作：
-        1. 使用解药救人（如果当晚有玩家被杀且拥有解药）；
-        2. 使用毒药杀人（如果还有毒药可用）。
-
-        此方法会与女巫进行交互，获取其决策，并更新游戏状态。
-
-        参数:
-            无
-
-        返回值:
-            无
+        此函数首先检查当晚是否有人被杀。如果有，且女巫拥有解药，
+        会询问女巫是否救人。之后，如果女巫拥有毒药，会询问是否要毒杀一名玩家。
+        根据女巫的决定更新游戏状态和玩家的生死。
         """
 
         def talk_witch(message: str):
-            # 通知女巫消息
             witch.private_chat(0, message)
 
         def record_witch(message: str):
-            # 将消息加入女巫的上下文
             Context(self, 0, message, self.get_players(t="id", role="witch"))
 
         witch = self.get_players(role="witch")
@@ -325,29 +190,27 @@ class Game:
 
         witch = witch[0]
 
-        # 有人死了，允许救人
         if self.kill_tonight:
+            victim = self.kill_tonight[0]
             if witch.antidote:
                 talk_witch(
-                    f"在{self.get_day}的晚上，{self.kill_tonight}号玩家被杀了，你可以选择救他或者不救，选择结果用[]包围，救请写[1]，不救请写[0]，你可以简短的给出理由。"
+                    f"在{self.get_day()}的晚上，{victim}号玩家被杀了，你可以选择救他或者不救，选择结果用[]包围，救请写[1]，不救请写[0]，你可以简短的给出理由。"
                 )
                 cured = extract_numbers_from_brackets(witch.messages[-1]["content"])
                 if cured and int(cured[-1]):
                     witch.antidote = True
                     record_witch(
-                        f"在{self.get_day}的晚上，{self.kill_tonight[0]}号玩家被杀了，你选择了救他。"
+                        f"在{self.get_day()}的晚上，{victim}号玩家被杀了，你选择了救他。"
                     )
-                    self.kill_tonight.remove(int(cured[-1]))
+                    self.kill_tonight.pop(0)
                     witch.antidote = False
             else:
                 record_witch(
-                    f"在{self.get_day}的晚上，{self.kill_tonight[0]}号玩家被杀了，但你没有解药，没法救他。"
+                    f"在{self.get_day()}的晚上，{victim}号玩家被杀了，但你没有解药，没法救他。"
                 )
-        # 没人死，不需要救人
         else:
-            record_witch(f"在{self.get_day}的晚上，在你的行动阶段之前，没有人死。")
+            record_witch(f"在{self.get_day()}的晚上，在你的行动阶段之前，没有人死。")
 
-        # 毒杀
         if witch.poison:
             talk_witch(
                 f"你可以选择毒杀别人，选择结果用[]包围，毒杀结果请写在[]中，例如你要杀1号玩家，请写[1]，不毒杀请写[0]。",
@@ -356,36 +219,31 @@ class Game:
             if int(poisoned[-1]):
                 witch.poison = True
                 record_witch(
-                    f"在{self.get_day}的晚上，你选择了毒杀{int(poisoned[-1])}号玩家。"
+                    f"在{self.get_day()}的晚上，你选择了毒杀{int(poisoned[-1])}号玩家。"
                 )
                 self.kill_tonight.append(int(poisoned[-1]))
                 witch.poison = False
         else:
-            record_witch(f"在{self.get_day}的晚上，你今晚没有毒，所以没有毒杀人。")
+            record_witch(f"在{self.get_day()}的晚上，你今晚没有毒，所以没有毒杀人。")
 
     def public_discussion(self):
-        """
-        进行公共讨论阶段，将起始讨论信息加入每个玩家的上下文并开始顺序发言。
+        """执行白天的公共讨论阶段。
 
-        参数:
-            无
-
-        返回值:
-            无
+        此函数向所有存活的玩家广播消息，提示他们进入公开讨论环节，
+        并可以开始依次发言。
         """
         players_pending = self.get_players()
         for player in players_pending:
             player.pub_chat(0, "请公开讨论，在此阶段你可以简短发言，解释讨论理由。")
 
     def vote(self) -> dict:
-        """
-        执行投票流程，收集所有玩家的投票并统计结果
+        """执行白天的投票阶段，并统计投票结果。
 
-        参数：
-            无
+        此函数向所有存活的玩家广播投票指示，收集每个玩家的投票选择。
+        然后统计所有投票，确定每个被投票玩家的得票数。
 
-        返回:
-            dict: 投票结果字典，键为玩家ID，值为获得的票数
+        Returns:
+            dict: 一个字典，键为被投票的玩家ID，值为该玩家获得的票数。
         """
         players_pending = self.get_players()
         for player in players_pending:
@@ -400,19 +258,65 @@ class Game:
                 result[int(voted[-1])] += 1
         return result
 
+    def out(self, player_ids: list):
+        """将一个或多个玩家标记为出局。
+
+        此函数将指定ID列表中的玩家的存活状态设置为False，
+        并向所有玩家广播出局信息。
+
+        Args:
+            player_ids (list): 需要出局的玩家ID列表。
+
+        Raises:
+            ValueError: 如果传入的玩家ID列表无效或找不到对应玩家。
+        """
+        if not player_ids:
+            self.broadcast("出局失败")
+            return
+        players_pending = self.get_players_by_ids(player_ids)
+        if not players_pending:
+            raise ValueError("出局失败")
+        for i in players_pending:
+            i.alive = False
+        self.broadcast(f"{str(player_ids)[1:-1]}号玩家出局")
+
+    def no_out(self, player_ids: list):
+        """将一个或多个出局的玩家重新标记为存活。
+
+        此函数将指定ID列表中的玩家的存活状态设置为True，
+        并向所有玩家广播该玩家回归游戏的信息。
+
+        Args:
+            player_ids (list): 需要恢复存活状态的玩家ID列表。
+
+        Raises:
+            ValueError: 如果传入的玩家ID列表无效或找不到对应玩家。
+        """
+        if not player_ids:
+            self.broadcast("加入失败")
+            return
+        players_pending = self.get_players_by_ids(player_ids)
+        if not players_pending:
+            raise ValueError("加入失败")
+        for i in players_pending:
+            i.alive = True
+        self.broadcast(f"{str(player_ids)[1:-1]}号玩家加入")
+
     def game_over(self) -> int:
-        """
-        判断游戏是否结束
+        """检查游戏是否满足结束条件。
 
-        返回:
-            int: 1表示游戏结束，0表示游戏继续进行
-        """
+        游戏结束条件：
+        1. 狼人数量大于或等于好人数量。
+        2. 所有狼人均已出局。
 
+        Returns:
+            int: 如果游戏结束则返回1，否则返回0。
+        """
         if (
             len(self.get_players(alive=True))
             - 2 * len(self.get_players(alive=True, role="werewolf"))
             < 0
-        ):  # 好人数量小于狼人数量
+        ):
             return 1
         elif len(self.get_players(alive=True, role="werewolf")) == 0:
             return 1
@@ -420,14 +324,13 @@ class Game:
             return 0
 
     def get_winner(self) -> str:
-        """
-        获取游戏胜利者
+        """在游戏结束后，判断并宣布胜利方。
 
-        该函数判断游戏的最终胜利者，根据存活玩家中狼人与好人数量的关系来决定胜负。
-        当狼人数量占优时狼人获胜，当所有狼人都被淘汰时好人获胜。
+        该函数首先检查游戏是否结束。如果已结束，则根据场上存活的
+        狼人与好人数量关系来确定胜者是“狼人”还是“好人”，并广播结果。
 
-        返回:
-            str: 返回胜利阵营名称，"狼人"或"好人"
+        Returns:
+            str: 返回胜利阵营的名称 ("狼人" 或 "好人")。
         """
         if self.game_over():
             if (
@@ -451,154 +354,37 @@ class Game:
                 )
                 return "好人"
 
-    def broadcast(self, content):
+    def init_game(self):
+        """初始化游戏的核心组件，包括玩家和上下文。
+
+        此函数负责：
+        1. 根据配置信息创建所有玩家对象并分配角色。
+        2. 为每个玩家初始化API客户端。
+        3. 为每个玩家初始化系统提示信息。
+        4. 创建全局游戏上下文。
         """
-        向所有玩家广播消息
-
-        参数:
-            content: 要广播的内容
-
-        返回值:
-            无返回值
-        """
-        Context(self, 0, content, self.get_players(t="id", alive=False))
-
-    def out(self, player_ids: list):
-        """
-        出局玩家，给定player_ids列表。
-        这将直接将给定玩家的存活状态设置为False，
-        并向所有玩家广播此消息。
-
-        参数:
-            player_ids (list): 玩家ID列表
-
-        返回值:
-            无返回值
-        """
-        if not player_ids:
-            self.broadcast("出局失败")
-            return
-        players_pending = self.get_players_by_ids(player_ids)
-        if not players_pending:
-            raise ValueError("出局失败")
-        for i in players_pending:
-            i.alive = False
-        self.broadcast(f"{str(player_ids)[1:-1]}号玩家出局")
-
-    def no_out(self, player_ids: list):
-        """
-        取消玩家出局状态，给定player_ids列表。
-        这将直接将给定玩家的存活状态设置为True，
-        并向所有玩家广播此消息。
-
-        参数:
-            player_ids (list): 玩家ID列表
-        """
-        if not player_ids:
-            self.broadcast("加入失败")
-            return
-        players_pending = self.get_players_by_ids(player_ids)
-        if not players_pending:
-            raise ValueError("加入失败")
-        for i in players_pending:
-            i.alive = True
-        self.broadcast(f"{str(player_ids)[1:-1]}号玩家加入")
-
-    def give_role(self):
-        new_role = choice(self.roles)
-        self.roles.remove(new_role)
-        return new_role
-
-    def day_night_change(self):
-        """
-        将游戏阶段推进一步，在白天和黑夜之间切换。
-
-        该函数会增加游戏阶段计数，确定当前的天数和时间（白天或黑夜），
-        并向所有玩家广播当前的游戏阶段。如果是第一天之后的早晨，
-        它会检查是否有玩家在夜间被标记为死亡。如果有，则广播被杀死的玩家列表
-        并更新他们的状态。如果没有玩家被标记为死亡，
-        则宣布夜间没有发生死亡事件。
-
-        参数：
-            无
-
-        返回：
-            无
-        """
-
-        self.stage += 1
-        days, morning_dusk = self.get_game_stage()
-        # self.broadcast(f"现在是第{days}天{'白天' if morning_dusk else '晚上'}")
-        self.guard_tonight = []
-        if morning_dusk == 1 and days > 1:
-            if self.kill_tonight:
-                self.kill_tonight = list(set(self.kill_tonight))
-                self.broadcast(f"昨晚{str(self.kill_tonight)[1:-1]}号玩家被杀了")
-                self.out(self.kill_tonight)
-                self.kill_tonight = []
-            else:
-                self.broadcast(f"昨晚是个平安夜，没有人被杀")
-
-    def get_game_stage(self):
-        """
-        以包含两个整数的元组形式返回当前游戏阶段。
-
-        元组的第一个元素是当前天数（从1开始索引），
-        第二个元素如果是白天则为1，如果是夜晚则为0。
-
-        游戏阶段从0开始，每次调用 [day_night_change](file://e:\AIs\LLMsWerewolves\core\game.py#L483-L505) 方法时递增1。
-        当前天数是游戏阶段整除2后加1的结果。
-        当前时间（白天或夜晚）由游戏阶段除以2的余数决定。
-
-        参数：
-            无
-
-        返回:
-            tuple: 包含两个整数的元组 (days, morning_dusk)，
-                其中 days 是当前天数（从1开始索引），
-                morning_dusk 如果是白天则为1，如果是夜晚则为0。
-        """
-        days = self.stage // 2 + 1
-        morning_dusk = (self.stage + 1) % 2  # 1表示白天，0表示晚上
-        return days, morning_dusk
-
-    def get_day(self):
-        return self.get_game_stage()[0]
-
-    def get_time(self):
-        return TIMEDIC[self.get_game_stage()[1]]
-
-    def __hash__(self):
-        return hash(self.id)
-
-    def __str__(self):
-        return f"第{self.get_day()}天{self.get_time()}"
-
-    def __eq__(self, value):
-        return self.id == value.id
+        for i in self.players_info.keys():
+            if i == "0" or i == 0:
+                continue
+            role = self.give_role()
+            preset = self.players_info[i]["preset"]
+            if not preset in self.clients:
+                client = OpenAI(
+                    api_key=self.apis[preset]["api_key"],
+                    base_url=self.apis[preset]["base_url"],
+                )
+                self.clients[preset] = client
+            Player(role, int(i), preset, self)
+        for i in self.players:
+            i.init_system_prompt()
+        Context(self, 0, self.role_prompts, self.get_players(t="id", alive=False))
 
     def set_logger(self):
+        """配置并初始化日志记录器。
+
+        该函数会创建日志目录（如果不存在），并设置日志的基本配置，
+        包括日志级别、格式和输出文件。日志文件名包含游戏名称和ID。
         """
-        设置日志记录器
-
-        该函数负责创建日志目录、配置日志基本信息、创建日志记录器实例，
-        并将日志记录器保存到实例变量中。
-
-        参数:
-            self: 类实例本身
-
-        返回值:
-            无返回值
-
-        功能说明:
-            1. 检查并创建日志目录
-            2. 配置日志基本设置，包括日志级别、格式、输出文件等
-            3. 创建指定ID的日志记录器
-            4. 输出一条测试性的调试日志
-            5. 将日志记录器保存到实例变量中供后续使用
-        """
-
-        # 创建文件处理器 (File Handler)
         if not os.path.exists("./log"):
             os.mkdir("./log")
 
@@ -614,3 +400,120 @@ class Game:
         logger.debug("这是一条调试信息")
 
         self.logger = logger
+
+    def get_players(
+        self, t: str = "object", alive: bool = True, role: str = "all"
+    ) -> list:
+        """根据条件筛选并获取玩家列表。
+
+        Args:
+            t (str, optional): 返回列表的元素类型。'object' 表示返回玩家对象，
+                'id' 表示返回玩家ID。默认为 'object'。
+            alive (bool, optional): 是否只返回存活的玩家。True表示只返回存活玩家。
+                默认为 True。
+            role (str, optional): 筛选特定角色。'all' 表示不限角色。
+                默认为 'all'。
+
+        Returns:
+            list: 符合筛选条件的玩家对象或ID的列表。
+        """
+        if role == "all":
+            if alive:
+                if t == "object":
+                    return [i for i in self.players if i.alive]
+                elif t == "id":
+                    return [i.id for i in self.players if i.alive]
+            else:
+                if t == "object":
+                    return self.players
+                elif t == "id":
+                    return [i.id for i in self.players]
+        else:
+            if alive:
+                if t == "object":
+                    return [i for i in self.players if i.role == role and i.alive]
+                elif t == "id":
+                    return [i.id for i in self.players if i.role == role and i.alive]
+            else:
+                if t == "object":
+                    return [i for i in self.players if i.role == role]
+                elif t == "id":
+                    return [i.id for i in self.players if i.role == role]
+
+    def get_players_by_ids(self, ids: list) -> list:
+        """根据玩家ID列表获取对应的玩家对象列表。
+
+        Args:
+            ids (list): 包含玩家ID的列表。
+
+        Returns:
+            list: 包含与ID匹配的Player对象的列表。
+        """
+        ids = [int(i) for i in ids]
+        players_pending = [i for i in self.players if i.id in ids]
+        return players_pending
+
+    def broadcast(self, content: str):
+        """向游戏中的所有玩家广播一条消息。
+
+        该消息将被添加到每个玩家（无论存活与否）的上下文中。
+
+        Args:
+            content (str): 要广播的消息内容。
+        """
+        Context(self, 0, content, self.get_players(t="id", alive=False))
+
+    def give_role(self) -> str:
+        """从剩余的角色池中随机分配一个角色。
+
+        此函数会从可用的角色列表中随机选择一个，然后将该角色的可用数量减一。
+        如果某个角色的数量减到零，则从可分配列表中移除。
+
+        Returns:
+            str: 分配出的角色名称。
+        """
+        new_role = choice(list(self.roles.keys()))
+        self.roles[new_role] -= 1
+        if self.roles[new_role] == 0:
+            del self.roles[new_role]
+        return new_role
+
+    def get_game_stage(self) -> tuple:
+        """计算并返回当前的游戏天数和时间（白天/黑夜）。
+
+        天数从1开始。白天用1表示，夜晚用0表示。
+
+        Returns:
+            tuple: 一个包含两个整数的元组 (天数, 时间标记)。
+        """
+        days = self.stage // 2 + 1
+        morning_dusk = (self.stage + 1) % 2
+        return days, morning_dusk
+
+    def get_day(self) -> str:
+        """获取当前游戏的天数。
+
+        Returns:
+            int: 当前的天数。
+        """
+        return self.get_game_stage()[0]
+
+    def get_time(self) -> str:
+        """获取当前游戏的时间（白天或晚上）。
+
+        Returns:
+            str: 表示当前时间的字符串（例如 "白天" 或 "晚上"）。
+        """
+        return TIMEDIC[self.get_game_stage()[1]]
+
+    def __hash__(self) -> int:
+        """返回游戏实例的哈希值，基于其唯一ID。"""
+        return hash(self.id)
+
+    def __str__(self) -> str:
+        """返回描述当前游戏状态的字符串。"""
+        return f"第{self.get_day()}天{self.get_time()}"
+
+    def __eq__(self, value) -> bool:
+        """判断两个游戏实例是否相等，基于它们的ID。"""
+        return self.id == value.id
