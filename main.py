@@ -188,49 +188,49 @@ def roles_divided(api_players_path):
             case "11":
                 if roles["werewolf"] > 0:
                     roles["werewolf"] -= 1
-                    roles["villgaer"] += 1
+                    roles["villager"] += 1
                 else:
                     print("狼人数量不足，无法减少！")
             case "2":
-                if roles["villager"] > 0:
+                if roles["villager"] > 0 and roles["seer"] == 0:
                     roles["seer"] += 1
                     roles["villager"] -= 1
-                elif roles["seer"] == 0:
-                    print("平民数量不足，无法增加！")
-                else:
+                elif roles["seer"] != 0:
                     print("预言家数量无法大于一个！")
+                else:
+                    print("平民数量不足，无法增加！")
             case "12":
                 if roles["seer"] > 0:
                     roles["seer"] -= 1
-                    roles["villgaer"] += 1
+                    roles["villager"] += 1
                 else:
                     print("预言家数量不足，无法减少！")
             case "3":
-                if roles["villager"] > 0:
+                if roles["villager"] > 0 and roles["witch"] == 0:
                     roles["witch"] += 1
                     roles["villager"] -= 1
-                elif roles["witch"] == 0:
-                    print("平民数量不足，无法增加！")
-                else:
+                elif roles["witch"] != 0:
                     print("女巫数量无法大于一个！")
+                else:
+                    print("平民数量不足，无法增加！")
             case "13":
                 if roles["witch"] > 0:
                     roles["witch"] -= 1
-                    roles["villgaer"] += 1
+                    roles["villager"] += 1
                 else:
                     print("女巫数量不足，无法减少！")
             case "4":
-                if roles["villager"] > 0:
+                if roles["villager"] > 0 and roles["guard"] == 0:
                     roles["guard"] += 1
                     roles["villager"] -= 1
-                elif roles["guard"] == 0:
-                    print("平民数量不足，无法增加！")
-                else:
+                elif roles["guard"] != 0:
                     print("守卫数量无法大于一个！")
+                else:
+                    print("平民数量不足，无法增加！")
             case "14":
                 if roles["guard"] > 0:
                     roles["guard"] -= 1
-                    roles["villgaer"] += 1
+                    roles["villager"] += 1
                 else:
                     print("守卫数量不足，无法减少！")
             case "0":
