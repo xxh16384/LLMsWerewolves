@@ -6,3 +6,6 @@ test.py
 config/api_template.json
 config/api_player.json
 config/player_info.json
+LLMsWerewolves.code-workspace
+config/apis.json
+test.py
