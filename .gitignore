@@ -9,3 +9,8 @@ config/player_info.json
 LLMsWerewolves.code-workspace
 config/apis.json
 test.py
+web_ui/common/__pycache__/components.cpython-312.pyc
+web_ui/__pycache__/__init__.cpython-312.pyc
+web_ui/common/__pycache__/layout.cpython-312.pyc
+web_ui/common/__pycache__/state.cpython-312.pyc
+web_ui/pages/__pycache__/config_page.cpython-312.pyc
