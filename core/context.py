@@ -62,7 +62,7 @@ class Context:
                 self.game.streamlit_log_trigger.set()
 
     @staticmethod
-    def get_context(ids: int, game):
+    def get_context(ids: int, game) -> list:
         """获取指定玩家在特定游戏中可见的所有信息。
 
         此静态方法遍历指定游戏的所有上下文记录，筛选出对特定玩家ID可见
@@ -85,7 +85,7 @@ class Context:
         return pub_messages
 
     @staticmethod
-    def get_chat_log(game, stage: int):
+    def get_chat_log(game, stage: int) -> list:
         """获取特定游戏在指定阶段的所有聊天记录。
 
         此静态方法用于从全局上下文中筛选出属于特定游戏和特定阶段的所有
@@ -104,7 +104,7 @@ class Context:
                 messages.append(i)
         return messages
 
-    def __str__(self):
+    def __str__(self) -> str:
         """返回该上下文信息的可读字符串表示形式。
 
         格式为“来源: 内容（可见范围）”。

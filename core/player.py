@@ -180,7 +180,7 @@ class Player:
             self.poison = True
             self.antidote = True
 
-    def __str__(self):
+    def __str__(self) -> str:
         """返回玩家对象的字符串表示形式。
 
         Returns:
