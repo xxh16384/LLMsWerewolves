@@ -1,8 +1,7 @@
-from openai import OpenAI
-import json
 import logging
 import os
 from time import time
+from random import choice
 from .tools import read_json, extract_numbers_from_brackets, find_max_key, makeDic
 from .context import Context
 from .player import Player
@@ -10,7 +9,9 @@ from .general import *
 
 
 class Game:
-    def __init__(self, game_name, players_info_path, apis_path, instructions_path):
+    def __init__(
+        self, game_name, players_info_path, apis_path, instructions_path, roles
+    ):
         """
         初始化游戏对象
 
@@ -32,13 +33,24 @@ class Game:
         self.apis = read_json(apis_path)
         self.players_info = read_json(players_info_path)
 
-        self.client = OpenAI(
-            api_key=self.apis["Model abbreviation"]["api_key"],
-            base_url=self.apis["Model abbreviation"]["base_url"],
-        )
+        # self.client = OpenAI(
+        #     api_key=self.apis["Model abbreviation"]["api_key"],
+        #     base_url=self.apis["Model abbreviation"]["base_url"],
+        # )
 
         self.players = []
+        self.roles = roles.copy()
+
+        self.role_prompts = f"\
+            这是一局有{len(self.roles)}个玩家的狼人杀游戏，\
+                一共有  {self.roles["werewolf"] + "个狼人，" if self.roles["werewolf"] > 0 else ""}\
+                        {self.roles["villager"] + "个村民，" if self.roles["villager"] > 0 else ""}\
+                        {self.roles["seer"] + "个预言家，" if self.roles["seer"] > 0 else ""}\
+                        {self.roles["witch"] + "个女巫，" if self.roles["witch"] > 0 else ""}\
+                        {self.roles["guard"] + "个守卫，" if self.roles["guard"] > 0 else ""}"
+
         self.init_game()
+
         self.kill_tonight = []
         self.guard_tonight = []
 
@@ -97,11 +109,14 @@ class Game:
         for i in self.players_info.keys():
             if i == "0" or i == 0:
                 continue
-            roles = self.players_info[i]["role"]
-            Player(roles, int(i), self)
+            # roles = self.players_info[i]["role"]
+            role = self.give_role()
+            preset = self.players_info[i]["preset"]
+            Player(role, int(i), preset, self)
         for i in self.players:
             i.init_system_prompt()
-        Context(self, 0, self.players_info["0"], self.get_players(t="id", alive=False))
+        # Context(self, 0, self.players_info["0"], self.get_players(t="id", alive=False))
+        Context(self, 0, self.role_prompts, self.get_players(t="id", alive=False))
 
     def get_players(self, t="object", alive=True, role="all"):
         """
@@ -258,6 +273,7 @@ class Game:
         返回值:
             无
         """
+
         def talk_seer(message: str):
             # 通知预言家消息
             seer.private_chat(0, message)
@@ -294,6 +310,7 @@ class Game:
         返回值:
             无
         """
+
         def talk_witch(message: str):
             # 通知女巫消息
             witch.private_chat(0, message)
@@ -321,6 +338,7 @@ class Game:
                         f"在{self.get_day}的晚上，{self.kill_tonight[0]}号玩家被杀了，你选择了救他。"
                     )
                     self.kill_tonight.remove(int(cured[-1]))
+                    witch.antidote = False
             else:
                 record_witch(
                     f"在{self.get_day}的晚上，{self.kill_tonight[0]}号玩家被杀了，但你没有解药，没法救他。"
@@ -341,6 +359,7 @@ class Game:
                     f"在{self.get_day}的晚上，你选择了毒杀{int(poisoned[-1])}号玩家。"
                 )
                 self.kill_tonight.append(int(poisoned[-1]))
+                witch.poison = False
         else:
             record_witch(f"在{self.get_day}的晚上，你今晚没有毒，所以没有毒杀人。")
 
@@ -484,6 +503,11 @@ class Game:
         for i in players_pending:
             i.alive = True
         self.broadcast(f"{str(player_ids)[1:-1]}号玩家加入")
+
+    def give_role(self):
+        new_role = choice(self.roles)
+        self.roles.remove(new_role)
+        return new_role
 
     def day_night_change(self):
         """

@@ -1,10 +1,11 @@
 from time import sleep
 from .context import Context
 from core.general import *
+from openai import OpenAI
 
 
 class Player:
-    def __init__(self, role: str, id: int, game):
+    def __init__(self, role: str, id: int, using_preset: str, game):
         """
         使用给定的模型、角色、ID和游戏上下文初始化Player实例。
 
@@ -27,8 +28,14 @@ class Player:
         """
 
         self.game = game
-        # self.client = OpenAI(api_key = game.apis["Model abbreviation"]["api_key"], base_url = game.apis["Model abbreviation"]["base_url"])
-        self.client = game.client
+
+        self.using_preset = using_preset
+
+        self.client = OpenAI(
+            api_key=game.apis[self.using_preset]["api_key"],
+            base_url=game.apis[self.using_preset]["base_url"],
+        )
+        # self.client = game.client
         self.role = role
         self.id = id
         self.alive = True
@@ -41,8 +48,8 @@ class Player:
 
     def init_role_special(self):
         if self.role == "witch":
-            self.poison = False
-            self.antidote = False
+            self.poison = True
+            self.antidote = True
 
     def init_system_prompt(self):
         """
@@ -117,7 +124,7 @@ class Player:
         print(f"{self} 的上下文： {message_and_time}")
 
         response = self.client.chat.completions.create(
-            model=self.game.apis["Model abbreviation"]["model_name"],
+            model=self.game.apis[self.using_preset]["model_name"],
             messages=message_and_time,
             stream=True,
         )
