@@ -1,16 +1,24 @@
-/__pycache__
-core/__pycache__
+# —————————— 清除所有log文件————————————#
 /log
+# —————————— 清除所有log文件————————————#
 
-test.py
+
+# —————————— 清除所有隐私文件———————————#
 config/api_template.json
-config/api_player.json
-config/player_info.json
-LLMsWerewolves.code-workspace
-config/apis.json
+config/api_players.json
+# —————————— 清除所有隐私文件———————————#
+
+
+# ——————————  清除所有测试文件 ——————————#
 test.py
-web_ui/common/__pycache__/components.cpython-312.pyc
-web_ui/__pycache__/__init__.cpython-312.pyc
-web_ui/common/__pycache__/layout.cpython-312.pyc
-web_ui/common/__pycache__/state.cpython-312.pyc
-web_ui/pages/__pycache__/config_page.cpython-312.pyc
+LLMsWerewolves.code-workspace
+# ——————————  清除所有测试文件 ——————————#
+
+
+# ——————————清除所有pycache缓存——————————#
+*.pyc
+web_ui/common/__pycache__/
+core/__pycache__
+/__pycache__
+# ——————————清除所有pycache缓存——————————#
+

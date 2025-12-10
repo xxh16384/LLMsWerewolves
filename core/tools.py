@@ -15,6 +15,14 @@ def read_json(file_path):
         return json.load(f)
 
 
+def print_json(input_json):
+    """
+    格式化输出json文本
+    """
+    formatted_data = json.dumps(input_json, indent=4)
+    print(formatted_data)
+
+
 def extract_numbers_from_brackets(text):
     """
     在文本中查找所有的方括号，并将方括号之间的内容尝试
