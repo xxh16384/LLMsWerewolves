@@ -7,11 +7,11 @@ class Context:
     def __init__(
         self,
         game,
-        source_id,
-        content,
-        visible_ids=[],
-        is_streaming=False,
-        last_block=False,
+        source_id: str,
+        content: str,
+        visible_ids: list = [],
+        is_streaming: bool = False,
+        last_block: bool = False,
     ):
         """初始化并记录一个新的游戏上下文（信息）实例。
 
@@ -42,12 +42,14 @@ class Context:
             ):
                 content = pre_block.content + content
                 Context.contexts[game].pop(-1)
+
         Context.contexts[game].append(self)
         self.game = game
         self.stage = game.stage
         self.is_streaming = is_streaming
         self.last_block = last_block
         self.source_id = source_id
+        content = f"【此信息被发出的时间:{game}，" + content + "】"
         self.content = content
         self.visible_ids = set(
             visible_ids + [source_id, 0] if visible_ids else [source_id, 0]
@@ -60,7 +62,7 @@ class Context:
                 self.game.streamlit_log_trigger.set()
 
     @staticmethod
-    def get_context(id, game):
+    def get_context(ids: int, game):
         """获取指定玩家在特定游戏中可见的所有信息。
 
         此静态方法遍历指定游戏的所有上下文记录，筛选出对特定玩家ID可见
@@ -68,7 +70,7 @@ class Context:
         的`<think>`标签内容。
 
         Args:
-            id (int): 玩家的ID。
+            ids (int): 玩家的ID。
             game (Game): 需要查询的游戏实例。
 
         Returns:
@@ -76,14 +78,14 @@ class Context:
         """
         pub_messages = []
         for i in Context.contexts[game]:
-            if id in i.visible_ids:
+            if ids in i.visible_ids:
                 pub_messages.append(
                     re.sub(r"<think>.*?</think>", "", str(i), flags=re.DOTALL)
                 )
         return pub_messages
 
     @staticmethod
-    def get_chat_log(game, stage):
+    def get_chat_log(game, stage: int):
         """获取特定游戏在指定阶段的所有聊天记录。
 
         此静态方法用于从全局上下文中筛选出属于特定游戏和特定阶段的所有
