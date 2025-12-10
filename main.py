@@ -1,7 +1,7 @@
 from core.tools import find_max_key
 from core.game import Game
 from core.general import *
-from core.tools import api_template_check, api_players_check, roles_divided
+from core.init import api_template_check, api_players_check, roles_divided
 
 
 if __name__ == "__main__":

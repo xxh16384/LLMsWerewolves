@@ -1,7 +1,6 @@
 from time import sleep
 from .context import Context
 from core.general import *
-from openai import OpenAI
 
 
 class Player:
@@ -31,11 +30,14 @@ class Player:
 
         self.using_preset = using_preset
 
-        self.client = OpenAI(
-            api_key=game.apis[self.using_preset]["api_key"],
-            base_url=game.apis[self.using_preset]["base_url"],
-        )
+        # self.client = OpenAI(
+        #     api_key=game.apis[self.using_preset]["api_key"],
+        #     base_url=game.apis[self.using_preset]["base_url"],
+        # )
         # self.client = game.client
+
+        self.client = game.clients[self.using_preset]
+
         self.role = role
         self.id = id
         self.alive = True

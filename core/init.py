@@ -1,5 +1,6 @@
 import json
 from .tools import read_json, print_json
+from .general import *
 
 
 def api_template_check(apis_path):
@@ -145,6 +146,26 @@ def api_players_check(apis_path, api_players_path):
 
 
 def roles_divided(api_players_path):
+    def add_role(role):
+        if roles["villager"] <= 0:
+            return "平民数量不足，无法增加！"
+        if role in ("seer", "witch", "guard") and roles[role] >= 1:
+            return f"{PLAYERDIC[role]}的数量无法大于一个！"
+
+        roles[role] += 1
+        roles["villager"] -= 1
+        return f"成功添加一个{PLAYERDIC[role]}。"
+
+    def remove_role(role):
+        if roles[role] <= 0:
+            return f"{PLAYERDIC[role]}数量不足以减少！"
+        if role in ("werewolf") and roles[role] <= 1:
+            return f"至少要有一个{PLAYERDIC[role]}！"
+
+        roles[role] -= 1
+        roles["villager"] += 1
+        return f"成功减少一个{PLAYERDIC[role]}"
+
     players = read_json(api_players_path)
     counts = len(players)
     roles = {}
@@ -173,59 +194,21 @@ def roles_divided(api_players_path):
 
         match (choice):
             case "1":
-                if roles["villager"] > 0:
-                    roles["werewolf"] += 1
-                    roles["villager"] -= 1
-                else:
-                    print("平民数量不足，无法增加！")
-            case "11":
-                if roles["werewolf"] > 0:
-                    roles["werewolf"] -= 1
-                    roles["villager"] += 1
-                else:
-                    print("狼人数量不足，无法减少！")
+                print(add_role("werewolf"))
             case "2":
-                if roles["villager"] > 0 and roles["seer"] == 0:
-                    roles["seer"] += 1
-                    roles["villager"] -= 1
-                elif roles["seer"] != 0:
-                    print("预言家数量无法大于一个！")
-                else:
-                    print("平民数量不足，无法增加！")
-            case "12":
-                if roles["seer"] > 0:
-                    roles["seer"] -= 1
-                    roles["villager"] += 1
-                else:
-                    print("预言家数量不足，无法减少！")
+                print(add_role("seer"))
             case "3":
-                if roles["villager"] > 0 and roles["witch"] == 0:
-                    roles["witch"] += 1
-                    roles["villager"] -= 1
-                elif roles["witch"] != 0:
-                    print("女巫数量无法大于一个！")
-                else:
-                    print("平民数量不足，无法增加！")
-            case "13":
-                if roles["witch"] > 0:
-                    roles["witch"] -= 1
-                    roles["villager"] += 1
-                else:
-                    print("女巫数量不足，无法减少！")
+                print(add_role("witch"))
             case "4":
-                if roles["villager"] > 0 and roles["guard"] == 0:
-                    roles["guard"] += 1
-                    roles["villager"] -= 1
-                elif roles["guard"] != 0:
-                    print("守卫数量无法大于一个！")
-                else:
-                    print("平民数量不足，无法增加！")
+                print(add_role("guard"))
+            case "11":
+                print(remove_role("werewolf"))
+            case "12":
+                print(remove_role("seer"))
+            case "13":
+                print(remove_role("witch"))
             case "14":
-                if roles["guard"] > 0:
-                    roles["guard"] -= 1
-                    roles["villager"] += 1
-                else:
-                    print("守卫数量不足，无法减少！")
+                print(remove_role("guard"))
             case "0":
                 if good_guy > bad_guy:
                     break

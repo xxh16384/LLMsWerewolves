@@ -6,6 +6,7 @@ from .tools import read_json, extract_numbers_from_brackets, find_max_key, makeD
 from .context import Context
 from .player import Player
 from .general import *
+from openai import OpenAI
 
 
 class Game:
@@ -33,6 +34,8 @@ class Game:
         self.apis = read_json(apis_path)
         self.players_info = read_json(players_info_path)
 
+        self.clients = {}
+
         # self.client = OpenAI(
         #     api_key=self.apis["Model abbreviation"]["api_key"],
         #     base_url=self.apis["Model abbreviation"]["base_url"],
@@ -40,14 +43,15 @@ class Game:
 
         self.players = []
         self.roles = roles.copy()
+        counts = sum([num for num in self.roles.values()])
 
         self.role_prompts = f"\
-            这是一局有{len(self.roles)}个玩家的狼人杀游戏，\
-                一共有  {self.roles["werewolf"] + "个狼人，" if self.roles["werewolf"] > 0 else ""}\
-                        {self.roles["villager"] + "个村民，" if self.roles["villager"] > 0 else ""}\
-                        {self.roles["seer"] + "个预言家，" if self.roles["seer"] > 0 else ""}\
-                        {self.roles["witch"] + "个女巫，" if self.roles["witch"] > 0 else ""}\
-                        {self.roles["guard"] + "个守卫，" if self.roles["guard"] > 0 else ""}"
+这是一局有{counts}个玩家的狼人杀游戏，一共有\
+{str(self.roles["werewolf"]) + "个狼人，" if self.roles["werewolf"] > 0 else ""}\
+{str(self.roles["villager"]) + "个村民，" if self.roles["villager"] > 0 else ""}\
+{str(self.roles["seer"]) + "个预言家，" if self.roles["seer"] > 0 else ""}\
+{str(self.roles["witch"]) + "个女巫，" if self.roles["witch"] > 0 else ""}\
+{str(self.roles["guard"]) + "个守卫，" if self.roles["guard"] > 0 else ""}"
 
         self.init_game()
 
@@ -112,6 +116,12 @@ class Game:
             # roles = self.players_info[i]["role"]
             role = self.give_role()
             preset = self.players_info[i]["preset"]
+            if not preset in self.clients:
+                client = OpenAI(
+                    api_key=self.apis[preset]["api_key"],
+                    base_url=self.apis[preset]["base_url"],
+                )
+                self.clients[preset] = client
             Player(role, int(i), preset, self)
         for i in self.players:
             i.init_system_prompt()
@@ -198,11 +208,9 @@ class Game:
             "你今晚要保护谁？要保护的玩家编号请用[]包围，若不保护人则输出[0]，例如'我要保护[7]号玩家'或'我不想保护人，[0]'。可以简短的给出理由。"
         )
         target = extract_numbers_from_brackets(guard.messages[-1]["content"])
-        if target and target != 0:
-            record_guard(
-                f"在{self.get_day}的晚上，你保护了玩家{self.get_players_by_ids(target)[0]}。"
-            )
-        self.guard_tonight.append(target)
+        if target and target[0] != 0:
+            record_guard(f"在{self.get_day()}的晚上，你保护了{target}号玩家。")
+        self.guard_tonight.append(target[0])
 
     def werewolf_killing(self):
         """
@@ -251,11 +259,11 @@ class Game:
 
         killed = find_max_key(result)
         if killed and killed != 0:
-            record_werewolf(f"在{self.get_day}的晚上，{killed}号玩家被狼人标记要杀。")
+            record_werewolf(f"在{self.get_day()}的晚上，{killed}号玩家被狼人标记要杀。")
             if not killed in self.guard_tonight:
                 self.kill_tonight.append(killed)
         else:
-            record_werewolf(f"在{self.get_day}的晚上，狼人没有选择任何人要杀。")
+            record_werewolf(f"在{self.get_day()}的晚上，狼人没有选择任何人要杀。")
 
     def seer_seeing(self):
         """
@@ -291,7 +299,7 @@ class Game:
         )
         target = extract_numbers_from_brackets(seer.messages[-1]["content"])
         record_seer(
-            f"在{self.get_day}的晚上，你查的玩家是{self.get_players_by_ids(target)[0]}，他的身份是{self.get_players_by_ids(target)[0].role}。"
+            f"在{self.get_day()}的晚上，你查的玩家是{target}号，他的身份是{self.get_players_by_ids(target)[0].role}。"
         )
 
     def witch_operation(self):
@@ -327,25 +335,26 @@ class Game:
 
         # 有人死了，允许救人
         if self.kill_tonight:
+            victim = self.kill_tonight[0]
             if witch.antidote:
                 talk_witch(
-                    f"在{self.get_day}的晚上，{self.kill_tonight}号玩家被杀了，你可以选择救他或者不救，选择结果用[]包围，救请写[1]，不救请写[0]，你可以简短的给出理由。"
+                    f"在{self.get_day()}的晚上，{victim}号玩家被杀了，你可以选择救他或者不救，选择结果用[]包围，救请写[1]，不救请写[0]，你可以简短的给出理由。"
                 )
                 cured = extract_numbers_from_brackets(witch.messages[-1]["content"])
                 if cured and int(cured[-1]):
                     witch.antidote = True
                     record_witch(
-                        f"在{self.get_day}的晚上，{self.kill_tonight[0]}号玩家被杀了，你选择了救他。"
+                        f"在{self.get_day()}的晚上，{victim}号玩家被杀了，你选择了救他。"
                     )
-                    self.kill_tonight.remove(int(cured[-1]))
+                    self.kill_tonight.pop(0)
                     witch.antidote = False
             else:
                 record_witch(
-                    f"在{self.get_day}的晚上，{self.kill_tonight[0]}号玩家被杀了，但你没有解药，没法救他。"
+                    f"在{self.get_day()}的晚上，{victim}号玩家被杀了，但你没有解药，没法救他。"
                 )
         # 没人死，不需要救人
         else:
-            record_witch(f"在{self.get_day}的晚上，在你的行动阶段之前，没有人死。")
+            record_witch(f"在{self.get_day()}的晚上，在你的行动阶段之前，没有人死。")
 
         # 毒杀
         if witch.poison:
@@ -356,12 +365,12 @@ class Game:
             if int(poisoned[-1]):
                 witch.poison = True
                 record_witch(
-                    f"在{self.get_day}的晚上，你选择了毒杀{int(poisoned[-1])}号玩家。"
+                    f"在{self.get_day()}的晚上，你选择了毒杀{int(poisoned[-1])}号玩家。"
                 )
                 self.kill_tonight.append(int(poisoned[-1]))
                 witch.poison = False
         else:
-            record_witch(f"在{self.get_day}的晚上，你今晚没有毒，所以没有毒杀人。")
+            record_witch(f"在{self.get_day()}的晚上，你今晚没有毒，所以没有毒杀人。")
 
     def public_discussion(self):
         """
@@ -505,8 +514,10 @@ class Game:
         self.broadcast(f"{str(player_ids)[1:-1]}号玩家加入")
 
     def give_role(self):
-        new_role = choice(self.roles)
-        self.roles.remove(new_role)
+        new_role = choice(list(self.roles.keys()))
+        self.roles[new_role] -= 1
+        if self.roles[new_role] == 0:
+            del self.roles[new_role]
         return new_role
 
     def day_night_change(self):
