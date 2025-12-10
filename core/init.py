@@ -3,9 +3,16 @@ from .tools import read_json, print_json
 from .general import *
 
 
-def api_template_check(apis_path):
-    """
-    判定是否有api_template.json，如果没有的话就辅助填充。
+def api_template_check(apis_path) -> None:
+    """检查API模板配置文件是否存在，若不存在则引导用户创建。
+
+    此函数首先尝试读取指定的API模板JSON文件。如果文件不存在或读取失败，
+    它会启动一个交互式的命令行界面，引导用户逐条输入API预设信息，
+    包括预设名称、URL、密钥和模型名称。用户可以添加多个预设，并
+    在完成所有填写后，将配置信息保存到指定的路径中。
+
+    Args:
+        apis_path (str): API模板配置文件的路径。
     """
     try:
         apis = read_json(apis_path)
@@ -61,7 +68,7 @@ def api_template_check(apis_path):
                 case "9":
                     print_json(apis)
                     choice2 = input(
-                        "若有想要删除的api预设，在此输入那个预设的名字，否则输入-1。"
+                        "若有想要删除的api预set，在此输入那个预设的名字，否则输入-1。"
                     )
                     if choice2 != -1:
                         try:
@@ -89,9 +96,17 @@ def api_template_check(apis_path):
                         print("写入json失败，我也不知道什么问题，自检吧")
 
 
-def api_players_check(apis_path, api_players_path):
-    """
-    判定是否有api_players.json，如果没有的话就辅助填充。
+def api_players_check(apis_path, api_players_path) -> None:
+    """检查玩家API配置文件是否存在，若不存在则引导用户创建。
+
+    此函数首先尝试读取玩家API配置文件。如果文件不存在，它会启动一个
+    交互式命令行界面，引导用户为游戏中的每一位玩家（从1号开始）分配
+    一个在 `apis_path` 文件中定义好的API预设。完成所有玩家的分配后，
+    配置将被写入指定的 `api_players_path` 文件。
+
+    Args:
+        apis_path (str): 已存在的API模板配置文件的路径，用于参考。
+        api_players_path (str): 待创建或检查的玩家API配置文件的路径。
     """
     apis = read_json(apis_path)
     try:
@@ -142,10 +157,25 @@ def api_players_check(apis_path, api_players_path):
                         break
                     except:
                         print("写入json失败，我也不知道什么问题，自检吧")
-    return apis
 
 
-def roles_divided(api_players_path):
+def roles_divided(api_players_path) -> dict:
+    """根据玩家总数，通过交互式界面分配游戏角色。
+
+    该函数首先从玩家配置文件中读取玩家总数，然后提供一个默认的角色配置。
+    接着，它启动一个命令行界面，允许用户通过输入指令来增加或减少各种
+    神职和狼人角色的数量，平民数量会相应自动调整。函数内置了逻辑来
+    确保角色分配的合理性（如神职唯一性、好人阵营人数多于坏人等）。
+    用户确认分配方案后，函数返回最终的角色配置。
+
+    Args:
+        api_players_path (str): 玩家API配置文件的路径，用于确定玩家总数。
+
+    Returns:
+        dict: 一个包含最终角色及其数量的字典。例如：
+            {'werewolf': 3, 'seer': 1, 'witch': 1, 'guard': 1, 'villager': 4}
+    """
+
     def add_role(role):
         if roles["villager"] <= 0:
             return "平民数量不足，无法增加！"

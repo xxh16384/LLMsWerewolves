@@ -1,3 +1,22 @@
+"""狼人杀游戏手动模式命令行启动脚本。
+
+该脚本作为游戏的主要入口点，用于在控制台环境中以手动模式运行一局狼人杀游戏。
+它首先会引导用户输入游戏的基本配置，如窗口名称和游戏模式。在选择了手动
+模式后，脚本会初始化游戏环境，包括加载指令、API配置和玩家信息，并创建
+一个核心的 `Game` 对象。
+
+随后，脚本进入一个无限循环，通过命令行菜单接收用户输入。用户可以根据提示
+输入数字指令来手动控制游戏的进程，例如：
+- 推进游戏到下一个夜晚。
+- 执行特定角色的夜间行动（守卫、狼人、预言家、女巫）。
+- 开启白天的公共讨论和投票环节。
+- 查看当前的游戏状态，包括存活玩家等信息。
+
+每执行一个命令，脚本都会调用 `Game` 对象中相应的方法来更新游戏状态。在每
+个循环的末尾，它会检查游戏是否满足结束条件。如果游戏结束，脚本会宣布
+胜利方并终止程序。用户也可以随时输入 `-1` 来手动结束游戏。
+"""
+
 from core.tools import find_max_key
 from core.game import Game
 from core.general import *
@@ -5,12 +24,9 @@ from core.init import api_template_check, api_players_check, roles_divided
 
 
 if __name__ == "__main__":
-    # 输入路径配置
-    # 控制台运行程序
-
     instructions_path = "./config/instructions.json"
-    apis_path = "./config/api_template.json"  # 只存储api
-    api_players_path = "./config/api_players.json"  # 只存储每个玩家的api，职业随机分配
+    apis_path = "./config/api_template.json"
+    api_players_path = "./config/api_players.json"
     game_name = input("请输入游戏窗口名称：")
     mode = input("请输入游戏模式（1、全自动模式(wip)，2、手动模式）：")
 
@@ -43,37 +59,29 @@ if __name__ == "__main__":
 
             match (cmd):
                 case "1":
-                    # 进入下一夜
                     game.day_night_change()
                 case "2":
-                    # 守护保人
                     game.guard_guarding()
                     print("守卫保卫阶段结束")
                 case "3":
-                    # 狼人杀人
                     game.werewolf_killing()
                     print("狼人杀人阶段结束")
                 case "4":
-                    # 预言家查验
                     game.seer_seeing()
                     print("预言家查验阶段结束")
                 case "5":
-                    # 女巫操作
                     game.witch_operation()
                     print("女巫操作阶段结束")
                 case "6":
                     game.day_night_change()
                     print(f"已进入: {game}")
-                    # 公共讨论
                     game.public_discussion()
                     print("公共讨论阶段结束")
                 case "7":
-                    # 投票
                     result = find_max_key(game.vote())
                     game.out([result])
                     print("投票阶段结束")
                 case "8":
-                    # 显示当前状态
                     print(
                         f"\n ————————————————————\
                           \n 当前游戏状态:\
@@ -84,13 +92,11 @@ if __name__ == "__main__":
                     for player in game.get_players(alive=True):
                         print(f" {player}")
                 case "-1":
-                    # 结束游戏
                     print("游戏已手动结束")
                     exit(0)
                 case _:
                     print("无效的命令,请重新输入")
 
-            # 检查游戏是否结束
             if game.game_over():
                 game.get_winner()
                 break
