@@ -6,24 +6,24 @@ from core.general import *
 class Player:
     def __init__(self, role: str, id: int, game):
         """
-        Initializes a Player instance with the given model, role, id, and game context.
+        使用给定的模型、角色、ID和游戏上下文初始化Player实例。
 
-        Args:
-            model (str): The model identifier used for the player, corresponding to an API configuration.
-            role (str): The role assigned to the player in the game (e.g., werewolf, villager, witch).
-            id (int): The unique identifier for the player.
-            game: The game context in which the player is participating.
+        参数:
+            model (str): 用于玩家的模型标识符，对应API配置。
+            role (str): 分配给玩家的游戏角色（例如，狼人、村民、女巫）。
+            id (int): 玩家的唯一标识符。
+            game: 玩家参与的游戏上下文。
 
-        Attributes:
-            game: The game context passed during initialization.
-            client: An instance of OpenAI client configured with the player's model.
-            role (str): The role of the player in the game.
-            id (int): The unique identifier of the player.
-            model (str): The model identifier used for the player.
-            alive (bool): A flag indicating whether the player is currently alive (default is True).
-            messages (list): A list of messages associated with the player.
-            poison (bool): A flag indicating the availability of poison for the witch role (default is False).
-            antidote (bool): A flag indicating the availability of antidote for the witch role (default is False).
+        属性:
+            game: 初始化期间传递的游戏上下文。
+            client: 使用玩家模型配置的OpenAI客户端实例。
+            role (str): 玩家在游戏中的角色。
+            id (int): 玩家的唯一标识符。
+            model (str): 用于玩家的模型标识符。
+            alive (bool): 标志玩家当前是否存活（默认为True）。
+            messages (list): 与玩家关联的消息列表。
+            poison (bool): 标志女巫角色是否有毒药可用（默认为False）。
+            antidote (bool): 标志女巫角色是否有解药可用（默认为False）。
         """
 
         self.game = game
@@ -46,22 +46,19 @@ class Player:
 
     def init_system_prompt(self):
         """
-        Initializes the system prompt for a player based on their role and game context.
+        基于玩家角色和游戏上下文初始化系统提示。
 
-        This method constructs a pre-instruction message for the player, indicating their
-        role in the game and any relevant information specific to their role. If the player's
-        role is 'werewolf', additional information about other werewolf players is included.
+        此方法为玩家构建预指令消息，指示他们在游戏中的角色以及与其角色相关的任何相关信息。
+        如果玩家的角色是"werewolf"(狼人)，则会包含其他狼人玩家的额外信息。
 
-        The constructed message is appended to the player's message list as a system message.
+        构建的消息作为系统消息追加到玩家的消息列表中。
 
-        Side Effects:
-            Updates the player's message list with a new system message containing the
-            role-specific instructions and information.
+        副作用:
+            使用包含角色特定指令和信息的新系统消息更新玩家的消息列表。
 
-        Attributes:
-            pre_instruction (str): The instruction message constructed for the player.
-            wolfs (list): A list of non-alive werewolf players, used to provide additional
-                        information for players with the 'werewolf' role.
+        属性:
+            pre_instruction (str): 为玩家构建的指令消息。
+            wolfs (list): 非存活的狼人玩家列表，用于为"werewolf"(狼人)角色的玩家提供额外信息。
         """
 
         pre_instruction = f"你是{self.id}号玩家，" + self.game.instructions[self.role]
@@ -72,25 +69,23 @@ class Player:
 
     def get_response(self, prompt, if_pub):
         """
-        Simulates a conversation with the player, given a prompt and whether the response should be public.
+        在给定提示和响应是否应公开的情况下，模拟与玩家的对话。
 
-        This method is used to get a response from the player in both the night and day phases of the game.
-        When the response should be public, the player is shown all publicly available messages before being asked
-        to respond. When the response should not be public, the player is shown all messages they can see, but
-        their response is not shared with other players.
+        此方法用于在游戏的夜晚和白天阶段都获得玩家的响应。
+        当响应应该公开时，在要求玩家回应之前，会向玩家显示所有公开可用的消息。
+        当响应不应该公开时，会向玩家显示他们能看到的所有消息，但他们的响应不会与其他玩家共享。
 
-        The player's response is appended to the game's context as a new message, and the response is also returned
-        by this method.
+        玩家的响应作为新消息追加到游戏上下文中，并且此方法也会返回该响应。
 
-        Parameters:
-            prompt (str): The prompt to be given to the player, which is used as the input for the AI model.
-            if_pub (bool): Whether the response should be public (True) or private (False).
+        参数:
+            prompt (str): 给玩家的提示，用作AI模型的输入。
+            if_pub (bool): 响应是否应该公开(True)或私密(False)。
 
-        Returns:
-            str: The player's response to the prompt.
+        返回:
+            str: 玩家对提示的响应。
 
-        Side Effects:
-            The player's response is appended to the game's context as a new message.
+        副作用:
+            玩家的响应作为新消息追加到游戏上下文中。
         """
 
         sleep(1)
@@ -179,11 +174,11 @@ class Player:
 
     def private_chat(self, source_id, content):
         """
-        Allows a player to send a private chat message to another player.
+        允许玩家向另一个玩家发送私人聊天消息。
 
-        Args:
-            source_id (int): The ID of the player sending the message.
-            content (str): The content of the chat message to be sent.
+        参数:
+            source_id (int): 发送消息的玩家ID。
+            content (str): 要发送的聊天消息内容。
         """
 
         if source_id == 0:
@@ -199,16 +194,15 @@ class Player:
 
     def pub_chat(self, source_id, content):
         """
-        Handles public chat messages within the game context.
+        处理游戏上下文中的公共聊天消息。
 
-        This method allows a player or the system (represented by source_id = 0) to send
-        a public chat message to all players. The message is processed and displayed
-        publicly, allowing all players to see the interaction.
+        此方法允许玩家或系统（由source_id = 0表示）向所有玩家发送公共聊天消息。
+        消息被处理并公开显示，让所有玩家都能看到互动。
 
-        Args:
-            source_id (int): The ID of the player or system sending the message.
-                            If 0, the message is from the system ("上帝").
-            content (str): The content of the message to be sent publicly.
+        参数:
+            source_id (int): 发送消息的玩家或系统的ID。
+                            如果为0，则消息来自系统("上帝")。
+            content (str): 要公开发送的消息内容。
         """
 
         Context(

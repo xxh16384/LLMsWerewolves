@@ -5,10 +5,10 @@ def read_json(file_path):
     """
     读取一个json文件
 
-    Args:
+    参数：
         file_path (str): json文件的路径
 
-    Returns:
+    返回：
         dict: json文件的内容
     """
     with open(file_path, "r", encoding="UTF-8") as f:
@@ -20,10 +20,10 @@ def extract_numbers_from_brackets(text):
     在文本中查找所有的方括号，并将方括号之间的内容尝试
     转换为整数
 
-    Args:
+    参数：
         text (str): 文本
 
-    Returns:
+    返回：
         list: 文本中所有的数字
     """
     numbers = []
@@ -52,16 +52,15 @@ def extract_numbers_from_brackets(text):
 
 def find_max_key(vote_dict):
     """
-    Finds the key with the maximum value in a dictionary.
+    查找字典中具有最大值的键。
 
-    If there are multiple keys with the same maximum value, the first one
-    encountered will be returned.
+    如果有多个键具有相同的最大值，则返回第一个遇到的键。
 
-    Args:
-        vote_dict (dict): The dictionary to search.
+    参数:
+        vote_dict (dict): 要搜索的字典。
 
-    Returns:
-        object: The key with the maximum value.
+    返回:
+        object: 具有最大值的键。
     """
     max_value = max(vote_dict.values())
     max_keys = [k for k, v in vote_dict.items() if v == max_value]

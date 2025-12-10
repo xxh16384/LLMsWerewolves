@@ -12,23 +12,16 @@ from .general import *
 class Game:
     def __init__(self, game_name, players_info_path, apis_path, instructions_path):
         """
-        Initialize a new game instance.
+        初始化游戏对象
 
-        Args:
-            game_name (str): the name of the game
-            players_info_path (str): the path to the players info json file
-            apis_path (str): the path to the apis json file
-            instructions_path (str): the path to the instructions json file
+        参数:
+            game_name (str): 游戏名称
+            players_info_path (str): 玩家信息文件路径
+            apis_path (str): API配置文件路径
+            instructions_path (str): 游戏指令文件路径
 
-        Attributes:
-            game_name (str): the name of the game
-            instructions (dict): the instructions for the game
-            apis (dict): the apis for the game
-            players_info (dict): the players info for the game
-            players (list): the players in the game
-            id (int): the id of the game
-            stage (int): the current stage of the game
-            kill_tonight (list): the players to be killed tonight
+        返回值:
+            无
         """
         self.game_name = game_name
         self.stage = 0
@@ -51,18 +44,24 @@ class Game:
 
     def set_logger(self):
         """
-        Set up the logger for the game.
+        设置日志记录器
 
-        The logger will output logs to the console and a markdown file
-        named `<game_name>.md` in the `log` directory.
+        该函数负责创建日志目录、配置日志基本信息、创建日志记录器实例，
+        并将日志记录器保存到实例变量中。
 
-        Args:
-            game_name (str): The name of the game.
+        参数:
+            无
 
-        Returns:
-            None
+        返回值:
+            无返回值
+
+        功能说明:
+            1. 检查并创建日志目录
+            2. 配置日志基本设置，包括日志级别、格式、输出文件等
+            3. 创建指定ID的日志记录器
+            4. 输出一条测试性的调试日志
+            5. 将日志记录器保存到实例变量中供后续使用
         """
-
         # 创建文件处理器 (File Handler)
         if not os.path.exists("./log"):
             os.mkdir("./log")
@@ -82,17 +81,19 @@ class Game:
 
     def init_game(self):
         """
-        Initializes the game by creating player instances and setting up the initial context.
+        初始化游戏对象
 
-        This function iterates over the players_info dictionary to create Player
-        objects for each player, excluding the entry with key "0". It then initializes
-        system prompts for each player and sets up the initial game context with a
-        broadcast message containing the game description.
+        该函数完成以下初始化工作：
+        1. 根据玩家信息创建除主持人外的所有玩家对象
+        2. 初始化所有玩家的系统提示信息
+        3. 创建游戏上下文环境
 
-        The initial game context is created with visibility to all players.
+        参数:
+            无
 
+        返回值:
+            无
         """
-
         for i in self.players_info.keys():
             if i == "0" or i == 0:
                 continue
@@ -104,20 +105,16 @@ class Game:
 
     def get_players(self, t="object", alive=True, role="all"):
         """
-        Retrieves a list of players based on specified criteria.
+        获取符合条件的玩家列表
 
-        Args:
-            t (str): Determines the return type. If "object", returns player objects.
-                    If "id", returns player ids. Defaults to "object".
-            alive (bool): If True, only includes players who are alive.
-                        If False, includes all players regardless of status. Defaults to True.
-            role (str): Specifies the role of players to retrieve. If "all", retrieves players of all roles.
-                        Otherwise, retrieves players with the specified role. Defaults to "all".
+        参数:
+            t (str): 返回数据类型，"object"返回玩家对象列表，"id"返回玩家ID列表，默认为"object"
+            alive (bool): 是否只返回存活的玩家，True表示只返回存活玩家，False表示返回所有玩家，默认为True
+            role (str): 玩家角色筛选条件，"all"表示不限制角色，其他值表示指定特定角色，默认为"all"
 
-        Returns:
-            list: A list of players or player ids based on the criteria specified by the arguments.
+        返回:
+            list: 根据参数条件筛选后的玩家列表，列表元素类型由参数t决定
         """
-
         if role == "all":
             if alive:
                 if t == "object":
@@ -143,13 +140,13 @@ class Game:
 
     def get_players_by_ids(self, ids: list):
         """
-        Returns a list of players according to given ids.
+        根据玩家ID列表获取对应的玩家对象列表
 
-        Args:
-            ids (list): A list of player ids.
+        参数:
+            ids (list): 包含玩家ID的列表，ID可以是字符串或数字类型
 
-        Returns:
-            list: A list of players with the given ids.
+        返回:
+            list: 包含匹配的Player对象的列表，如果找不到对应ID的玩家则返回空列表
         """
         ids = [int(i) for i in ids]
         players_pending = [i for i in self.players if i.id in ids]
@@ -157,7 +154,16 @@ class Game:
 
     def guard_guarding(self):
         """
-        不写注释了。
+        处理守卫角色的保护行动
+
+        该函数负责与守卫玩家交互，获取其保护目标，并记录相关上下文信息。
+        守卫可以在夜间选择保护一名玩家，或者选择不保护任何人。
+
+        参数:
+            无
+
+        返回值:
+            无
         """
 
         def talk_guard(message: str):
@@ -185,21 +191,19 @@ class Game:
 
     def werewolf_killing(self):
         """
-        Executes the werewolf killing phase during the night.
+        狼人杀人阶段的主要逻辑函数
 
-        This function handles the process where werewolf players decide which player
-        to kill during the night. It sends a message to all werewolf players asking
-        them to select a target for elimination. The players then vote on a target
-        and the one with the most votes is marked for killing. If a player is
-        successfully chosen to be killed, a context message is created to indicate
-        the player's elimination. If no decision is reached, a failure message is
-        logged.
+        该函数处理狼人讨论和投票杀人的完整流程，包括：
+        1. 通知所有狼人进行讨论
+        2. 收集狼人的杀人投票
+        3. 统计投票结果并确定被杀目标
+        4. 记录杀人意图到游戏上下文
 
-        The function updates the `kill_tonight` list with the id of the player
-        chosen to be killed.
+        参数:
+            无
 
-        Returns:
-            None
+        返回值:
+            无返回值
         """
 
         def talk_werewolf(target, message: str):
@@ -240,17 +244,20 @@ class Game:
 
     def seer_seeing(self):
         """
-        Now it's the seer's turn to see someone's role.
+        处理预言家夜晚查验身份的逻辑流程
 
-        1. The seer is asked to input the id of the player they want to see.
-        2. The seer is given the role of the player they want to see.
+        该函数负责：
+        1. 获取当前存活的预言家玩家
+        2. 向预言家发送查验指令消息
+        3. 解析预言家的选择结果
+        4. 记录查验结果到游戏上下文
 
-        The message flow is as follows:
-        Server -> Seer: "你今晚要查谁？"
-        Seer -> Server: "[7]号玩家"
-        Server -> Seer: "你今晚要查的玩家是7号玩家，他的身份是witch"
+        参数:
+            无
+
+        返回值:
+            无
         """
-
         def talk_seer(message: str):
             # 通知预言家消息
             seer.private_chat(0, message)
@@ -273,14 +280,20 @@ class Game:
 
     def witch_operation(self):
         """
-        女巫的操作
-        如果今晚有人被杀，女巫可以选择救他或者不救
-        如果女巫选择救他，女巫将被标记为抗毒
-        如果女巫选择不救，女巫可以选择毒杀别人
-        如果女巫选择毒杀，女巫将被标记为毒药
-        如果女巫没有毒药，女巫不能毒杀
-        """
+        执行女巫角色的操作逻辑。
 
+        女巫每晚可以执行两个操作：
+        1. 使用解药救人（如果当晚有玩家被杀且拥有解药）；
+        2. 使用毒药杀人（如果还有毒药可用）。
+
+        此方法会与女巫进行交互，获取其决策，并更新游戏状态。
+
+        参数:
+            无
+
+        返回值:
+            无
+        """
         def talk_witch(message: str):
             # 通知女巫消息
             witch.private_chat(0, message)
@@ -333,11 +346,13 @@ class Game:
 
     def public_discussion(self):
         """
-        Public discussion process. Sends a message to all players to discuss,
-        then collects all the discussion content and shows it to all players.
+        进行公共讨论阶段，将起始讨论信息加入每个玩家的上下文并开始顺序发言。
 
-        Returns:
-            None
+        参数:
+            无
+
+        返回值:
+            无
         """
         players_pending = self.get_players()
         for player in players_pending:
@@ -345,13 +360,13 @@ class Game:
 
     def vote(self) -> dict:
         """
-        Voting process. First, sends a message to all players to vote. Then,
-        collects all the votes and returns a dictionary where the keys are the
-        player ids and the values are the number of votes they got.
+        执行投票流程，收集所有玩家的投票并统计结果
 
-        Returns:
-            dict: A dictionary where the keys are the player ids and the values
-                are the number of votes they got.
+        参数：
+            无
+
+        返回:
+            dict: 投票结果字典，键为玩家ID，值为获得的票数
         """
         players_pending = self.get_players()
         for player in players_pending:
@@ -368,16 +383,10 @@ class Game:
 
     def game_over(self) -> int:
         """
-        Determines if the game is over and declares the winner.
+        判断游戏是否结束
 
-        Checks the number of alive players and compares the number of werewolves to the
-        number of non-werewolf players. If the number of werewolves is greater than or
-        equal to the non-werewolf players, the werewolves win. If there are no remaining
-        werewolves, the non-werewolf players win. Returns 1 if the game is over, otherwise 0.
-
-        Returns:
-            int: 1 if the game is over (either werewolves or non-werewolves have won),
-            0 if the game is not yet over.
+        返回:
+            int: 1表示游戏结束，0表示游戏继续进行
         """
 
         if (
@@ -392,6 +401,15 @@ class Game:
             return 0
 
     def get_winner(self) -> str:
+        """
+        获取游戏胜利者
+
+        该函数判断游戏的最终胜利者，根据存活玩家中狼人与好人数量的关系来决定胜负。
+        当狼人数量占优时狼人获胜，当所有狼人都被淘汰时好人获胜。
+
+        返回:
+            str: 返回胜利阵营名称，"狼人"或"好人"
+        """
         if self.game_over():
             if (
                 len(self.get_players(alive=True))
@@ -416,21 +434,27 @@ class Game:
 
     def broadcast(self, content):
         """
-        Broadcast a message to all players.
+        向所有玩家广播消息
 
-        Args:
-            content (str): content of the message to be broadcasted
+        参数:
+            content: 要广播的内容
+
+        返回值:
+            无返回值
         """
         Context(self, 0, content, self.get_players(t="id", alive=False))
 
     def out(self, player_ids: list):
         """
-        to out players, given player_ids list.
-        this will directly set the alive status of given players to False,
-        and broadcast the message to all players.
+        出局玩家，给定player_ids列表。
+        这将直接将给定玩家的存活状态设置为False，
+        并向所有玩家广播此消息。
 
-        Args:
-            player_ids (list): list of player ids
+        参数:
+            player_ids (list): 玩家ID列表
+
+        返回值:
+            无返回值
         """
         if not player_ids:
             self.broadcast("出局失败")
@@ -444,11 +468,12 @@ class Game:
 
     def no_out(self, player_ids: list):
         """
-        to no out players, given player_ids list.
-        this will directly set the alive status of given players to True,
-        and broadcast the message to all players.
-        Args:
-            player_ids (list): list of player ids
+        取消玩家出局状态，给定player_ids列表。
+        这将直接将给定玩家的存活状态设置为True，
+        并向所有玩家广播此消息。
+
+        参数:
+            player_ids (list): 玩家ID列表
         """
         if not player_ids:
             self.broadcast("加入失败")
@@ -462,13 +487,19 @@ class Game:
 
     def day_night_change(self):
         """
-        Advances the game stage by one, transitioning between day and night.
+        将游戏阶段推进一步，在白天和黑夜之间切换。
 
-        This function increments the game stage, determines the current day and time (day or night),
-        and broadcasts the current game stage to all players. If it is morning of any day after the first,
-        it checks if any players were marked to be killed overnight. If there are, it broadcasts the list
-        of players who were killed and updates their status. If no players were marked for death,
-        it announces that no deaths occurred overnight.
+        该函数会增加游戏阶段计数，确定当前的天数和时间（白天或黑夜），
+        并向所有玩家广播当前的游戏阶段。如果是第一天之后的早晨，
+        它会检查是否有玩家在夜间被标记为死亡。如果有，则广播被杀死的玩家列表
+        并更新他们的状态。如果没有玩家被标记为死亡，
+        则宣布夜间没有发生死亡事件。
+
+        参数：
+            无
+
+        返回：
+            无
         """
 
         self.stage += 1
@@ -486,23 +517,22 @@ class Game:
 
     def get_game_stage(self):
         """
-        Returns the current game stage as a tuple of two integers.
+        以包含两个整数的元组形式返回当前游戏阶段。
 
-        The first element of the tuple is the current day number (1-indexed),
-        and the second element is 1 if the current time is day, and 0 if it
-        is night.
+        元组的第一个元素是当前天数（从1开始索引），
+        第二个元素如果是白天则为1，如果是夜晚则为0。
 
-        The game stage starts at 0, and increments by 1 each time the
-        day_night_change method is called. The current day number is the
-        integer division of the game stage by 2, plus 1. The current time
-        (day or night) is determined by the remainder of the game stage
-        divided by 2.
+        游戏阶段从0开始，每次调用 [day_night_change](file://e:\AIs\LLMsWerewolves\core\game.py#L483-L505) 方法时递增1。
+        当前天数是游戏阶段整除2后加1的结果。
+        当前时间（白天或夜晚）由游戏阶段除以2的余数决定。
 
-        Returns:
-            tuple: A tuple of two integers, (days, morning_dusk),
-                where days is the current day number (1-indexed), and
-                morning_dusk is 1 if the current time is day, and 0 if
-                it is night.
+        参数：
+            无
+
+        返回:
+            tuple: 包含两个整数的元组 (days, morning_dusk)，
+                其中 days 是当前天数（从1开始索引），
+                morning_dusk 如果是白天则为1，如果是夜晚则为0。
         """
         days = self.stage // 2 + 1
         morning_dusk = (self.stage + 1) % 2  # 1表示白天，0表示晚上
@@ -522,3 +552,41 @@ class Game:
 
     def __eq__(self, value):
         return self.id == value.id
+
+    def set_logger(self):
+        """
+        设置日志记录器
+
+        该函数负责创建日志目录、配置日志基本信息、创建日志记录器实例，
+        并将日志记录器保存到实例变量中。
+
+        参数:
+            self: 类实例本身
+
+        返回值:
+            无返回值
+
+        功能说明:
+            1. 检查并创建日志目录
+            2. 配置日志基本设置，包括日志级别、格式、输出文件等
+            3. 创建指定ID的日志记录器
+            4. 输出一条测试性的调试日志
+            5. 将日志记录器保存到实例变量中供后续使用
+        """
+
+        # 创建文件处理器 (File Handler)
+        if not os.path.exists("./log"):
+            os.mkdir("./log")
+
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            filename=f"./log/{self.game_name}-id={self.id}.md",
+            encoding="UTF-8",
+        )
+
+        logger = logging.getLogger(str(self.id))
+
+        logger.debug("这是一条调试信息")
+
+        self.logger = logger
