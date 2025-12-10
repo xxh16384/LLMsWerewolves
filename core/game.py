@@ -9,7 +9,9 @@ from .general import *
 
 
 class Game:
-    def __init__(self, game_name, players_info_path, apis_path, instructions_path):
+    def __init__(
+        self, game_name, players_info_path, apis_path, instructions_path, roles
+    ):
         """
         初始化游戏对象
 
@@ -37,18 +39,15 @@ class Game:
         # )
 
         self.players = []
-        self.roles = [
-            "villager",
-            "villager",
-            "werewolf",
-            "werewolf",
-            "werewolf",
-            "guard",
-            "seer",
-            "witch",
-        ]
+        self.roles = roles.copy()
 
-        print(self.roles)
+        self.role_prompts = f"\
+            这是一局有{len(self.roles)}个玩家的狼人杀游戏，\
+                一共有  {self.roles["werewolf"] + "个狼人，" if self.roles["werewolf"] > 0 else ""}\
+                        {self.roles["villager"] + "个村民，" if self.roles["villager"] > 0 else ""}\
+                        {self.roles["seer"] + "个预言家，" if self.roles["seer"] > 0 else ""}\
+                        {self.roles["witch"] + "个女巫，" if self.roles["witch"] > 0 else ""}\
+                        {self.roles["guard"] + "个守卫，" if self.roles["guard"] > 0 else ""}"
 
         self.init_game()
 
@@ -116,7 +115,8 @@ class Game:
             Player(role, int(i), preset, self)
         for i in self.players:
             i.init_system_prompt()
-        Context(self, 0, self.players_info["0"], self.get_players(t="id", alive=False))
+        # Context(self, 0, self.players_info["0"], self.get_players(t="id", alive=False))
+        Context(self, 0, self.role_prompts, self.get_players(t="id", alive=False))
 
     def get_players(self, t="object", alive=True, role="all"):
         """

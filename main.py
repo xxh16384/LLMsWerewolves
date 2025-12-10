@@ -114,9 +114,6 @@ def api_players_check(apis_path, api_players_path):
              \n 进入辅助填充阶段。\
              \n 理论上来讲你只会进入此页面一次。"
         )
-        players = {
-            "0": "这是一局有8个玩家的狼人杀游戏，分别有3个狼人，3个村民，一个预言家和一个女巫",
-        }
         player_id = 1
         player_preset = "无"
         while True:
@@ -154,6 +151,96 @@ def api_players_check(apis_path, api_players_path):
     return apis
 
 
+def roles_divided(api_players_path):
+    players = read_json(api_players_path)
+    counts = len(players)
+    roles = {}
+    roles["werewolf"] = 3
+    roles["seer"] = 1
+    roles["witch"] = 1
+    roles["guard"] = 1
+    while True:
+        roles["villager"] = (
+            counts - roles["werewolf"] - roles["seer"] - roles["witch"] - roles["guard"]
+        )
+        bad_guy = roles["werewolf"]
+        good_guy = roles["villager"] + roles["seer"] + roles["witch"] + roles["guard"]
+        print(
+            f"\n ——————————————————\
+              \n 请输入这一局的职业划分，\
+              \n [a/b]中，a代表加1人，b代表减1人\
+              \n [1/11] 狼人 数量 : {roles["werewolf"]:2d}\
+              \n [2/12]预言家数量 : {roles["seer"]:2d}\
+              \n [3/13] 女巫 数量 : {roles["witch"]:2d}\
+              \n [4/14] 守卫 数量 : {roles["guard"]:2d}\
+              \n [----] 平民 数量 : {roles["villager"]:2d}\
+              \n [0]    完成职业划分"
+        )
+        choice = input("请输入；")
+
+        match (choice):
+            case "1":
+                if roles["villager"] > 0:
+                    roles["werewolf"] += 1
+                    roles["villager"] -= 1
+                else:
+                    print("平民数量不足，无法增加！")
+            case "11":
+                if roles["werewolf"] > 0:
+                    roles["werewolf"] -= 1
+                    roles["villgaer"] += 1
+                else:
+                    print("狼人数量不足，无法减少！")
+            case "2":
+                if roles["villager"] > 0:
+                    roles["seer"] += 1
+                    roles["villager"] -= 1
+                elif roles["seer"] == 0:
+                    print("平民数量不足，无法增加！")
+                else:
+                    print("预言家数量无法大于一个！")
+            case "12":
+                if roles["seer"] > 0:
+                    roles["seer"] -= 1
+                    roles["villgaer"] += 1
+                else:
+                    print("预言家数量不足，无法减少！")
+            case "3":
+                if roles["villager"] > 0:
+                    roles["witch"] += 1
+                    roles["villager"] -= 1
+                elif roles["witch"] == 0:
+                    print("平民数量不足，无法增加！")
+                else:
+                    print("女巫数量无法大于一个！")
+            case "13":
+                if roles["witch"] > 0:
+                    roles["witch"] -= 1
+                    roles["villgaer"] += 1
+                else:
+                    print("女巫数量不足，无法减少！")
+            case "4":
+                if roles["villager"] > 0:
+                    roles["guard"] += 1
+                    roles["villager"] -= 1
+                elif roles["guard"] == 0:
+                    print("平民数量不足，无法增加！")
+                else:
+                    print("守卫数量无法大于一个！")
+            case "14":
+                if roles["guard"] > 0:
+                    roles["guard"] -= 1
+                    roles["villgaer"] += 1
+                else:
+                    print("守卫数量不足，无法减少！")
+            case "0":
+                if good_guy > bad_guy:
+                    break
+                else:
+                    print("好人数量太少了！至少要比坏人数量多一个！")
+    return roles
+
+
 if __name__ == "__main__":
     # 输入路径配置
     # 控制台运行程序
@@ -167,7 +254,9 @@ if __name__ == "__main__":
     api_template_check(apis_path)
     api_players_check(apis_path, api_players_path)
 
-    game = Game(game_name, api_players_path, apis_path, instructions_path)
+    roles = roles_divided(api_players_path)
+
+    game = Game(game_name, api_players_path, apis_path, instructions_path, roles)
 
     if mode == "2":
 
@@ -187,7 +276,7 @@ if __name__ == "__main__":
                  \n ————————————————————\n"
             )
             print(f"【当前阶段：{game}】\n")
-            cmd = input("请输入命令(1-8): ")
+            cmd = input("请输入命令: ")
 
             match (cmd):
                 case "1":
