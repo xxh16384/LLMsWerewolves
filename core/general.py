@@ -7,4 +7,12 @@ PLAYERDIC = {
 }
 PLAYERDIC_REVERSE = {v: k for k, v in PLAYERDIC.items()}
 
+EMOJIDIC = {
+    "werewolf": "🐺",
+    "villager": "🧑",
+    "witch": "🧙‍♂️",
+    "seer": "🔮",
+    "guard": "🛡",
+}
+
 TIMEDIC = {1: "白天", 0: "晚上"}

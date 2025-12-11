@@ -40,8 +40,15 @@ class Game:
 
         self.players = []
         self.roles = roles.copy()
-        counts = sum([num for num in self.roles.values()])
+        self.init_role_prompt()
 
+        self.init_game()
+
+        self.kill_tonight = []
+        self.guard_tonight = []
+
+    def init_role_prompt(self):
+        counts = sum([num for num in self.roles.values()])
         self.role_prompts = f"\
 这是一局有{counts}个玩家的狼人杀游戏，一共有\
 {str(self.roles["werewolf"]) + "个狼人，" if self.roles["werewolf"] > 0 else ""}\
@@ -49,11 +56,6 @@ class Game:
 {str(self.roles["seer"]) + "个预言家，" if self.roles["seer"] > 0 else ""}\
 {str(self.roles["witch"]) + "个女巫，" if self.roles["witch"] > 0 else ""}\
 {str(self.roles["guard"]) + "个守卫，" if self.roles["guard"] > 0 else ""}"
-
-        self.init_game()
-
-        self.kill_tonight = []
-        self.guard_tonight = []
 
     def day_night_change(self):
         """处理昼夜交替，推进游戏阶段。

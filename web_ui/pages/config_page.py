@@ -184,7 +184,22 @@ def config_page():
                     {"name":"key",'field':"key", "label": "API密钥"},
                     {"name":"model",'field':"model", "label": "模型名称"},
                     {"name":"accesable","field":"accesable", "label": "可用性"}]
-                rows = [{"preset":"我","url":"是","key":"示","model":"例","accesable":"❌"}]
+                if not game_config["apis"]:
+                    rows = [{"preset":"我","url":"是","key":"示","model":"例","accesable":"❌"}]
+                else:
+                    rows = []
+
+                    for key, value in game_config["apis"].items():
+                        # 检查是否已有测试结果
+                        if key in game_config["api_test_results"]:
+                            is_accessible = game_config["api_test_results"][key]
+                            status = "✅" if is_accessible else "❌"
+                        else:
+                            # 首次测试或需要重新测试
+                            status = "🔄"
+
+                        rows.append({"preset": key,"url": value["base_url"],"key": value["api_key"],"model": value["model_name"],"accesable": status
+                        })
                 api_present_table = ui.table(columns=columns, rows=rows, row_key='preset',selection="none").classes('w-full')
                 manage_api_button = ui.button('管理模型', on_click=manage_api)
                 update_manage_api_button()
@@ -271,7 +286,7 @@ def config_page():
 
             with ui.card().classes('w-full'):
                 ui.label('玩家数量：')
-                player_num_slider = ui.slider(min=3, max=16, value=5,on_change=update_slider)
+                player_num_slider = ui.slider(min=3, max=16, value=len(game_config["players_info"]),on_change=update_slider)
                 ui.label().bind_text_from(player_num_slider, 'value')
 
             with ui.card().classes('w-full'):
@@ -294,7 +309,10 @@ def config_page():
                 ui.button('上一步', on_click=stepper.previous).props('flat')
         with ui.step('完成'):
             with ui.stepper_navigation():
-                ui.button('完成配置！', on_click=lambda: ui.notify('芜湖~', type='positive'))
+                def complete():
+                    ui.notify('芜湖~', type='positive')
+                    game_config["config_valid"]=True
+                ui.button('完成配置！', on_click=complete)
                 ui.button('上一步', on_click=stepper.previous).props('flat')
 
 

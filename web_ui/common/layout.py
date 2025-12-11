@@ -22,6 +22,7 @@ def theme_layout(func):
         with left_drawer:
             ui.label('导航').classes('px-4 py-4 text-xs text-gray-400 uppercase font-bold')
             menu_link('⚙️ 游戏配置', '/')
+            menu_link('🙋‍♂️ 手动模式', '/manual')
 
         # 4. 页面主要内容区
         with ui.column().classes('w-full p-6 bg-gray-50 min-h-screen'):
