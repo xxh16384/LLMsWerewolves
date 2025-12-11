@@ -1,4 +1,6 @@
 import json
+from openai import AsyncOpenAI
+import asyncio
 
 
 def read_json(file_path: str) -> dict:
@@ -83,3 +85,28 @@ def makeDic(array: list) -> dict:
         dict: 一个键为对象ID，值为0的字典。
     """
     return {element.id: 0 for element in array}
+
+async def test_api_key(api_preset: dict) -> bool:
+    """
+    测试API密钥是否有效
+
+    Args:
+        api_preset (dict): 包含API配置的字典，必须包含"api_key"、"base_url"和"model_name"键
+
+    Returns:
+        bool: API有效返回True，无效返回False
+    """
+
+    # 检查参数合规
+    if "api_key" not in api_preset or "base_url" not in api_preset or "model_name" not in api_preset:
+        return False
+
+    client = AsyncOpenAI(api_key=api_preset["api_key"],base_url=api_preset["base_url"],timeout=10)
+    try:
+        response = await client.models.list()
+        models = [i["id"] for i in response.model_dump()["data"]]
+        if api_preset["model_name"] not in models:
+            return False
+        return True
+    except:
+        return False

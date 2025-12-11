@@ -45,12 +45,12 @@ def config_page():
                     add_preset_button.disable()
                 add_preset_button.update()
             
-            def update_next_button():
+            def update_model_next_button():
                 if len(game_config["apis"]) != 0:
-                    next_button.enable()
+                    model_management_next_button.enable()
                 else:
-                    next_button.disable()
-                next_button.update()
+                    model_management_next_button.disable()
+                model_management_next_button.update()
 
             def update_manage_api_button():
                 nonlocal manage_api_button_down
@@ -74,7 +74,7 @@ def config_page():
             def update_elements():
                 update_api_present_table()
                 update_manage_api_button()
-                update_next_button()
+                update_model_next_button()
                 update_api_present_table()
             def manage_api():
                 nonlocal manage_api_button_down
@@ -119,8 +119,8 @@ def config_page():
                 update_manage_api_button()
 
             with ui.stepper_navigation():
-                next_button = ui.button('下一步', on_click=stepper.next)
-                update_next_button()
+                model_management_next_button = ui.button('下一步', on_click=stepper.next)
+                update_model_next_button()
         with ui.step('玩家配置'):
             ui.label('Mix the ingredients')
             with ui.stepper_navigation():
