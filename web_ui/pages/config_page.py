@@ -3,6 +3,8 @@ from nicegui import ui
 from web_ui.common.layout import theme_layout
 from web_ui.common.components import section_title
 from web_ui.common.state import game_config
+from core.tools import test_api_key
+import asyncio
 
 @ui.page('/')
 @theme_layout  # <--- 套用布局
@@ -17,6 +19,8 @@ def config_page():
             api_model = ''
             valided = {"preset":False, "url":False, "key":False, "model":False}
             manage_api_button_down = False
+            if "api_test_results" not in game_config:
+                game_config["api_test_results"] = {}
             def update_api_preset(e):
                 nonlocal api_preset
                 api_preset = e.value
@@ -44,10 +48,14 @@ def config_page():
                 else:
                     add_preset_button.disable()
                 add_preset_button.update()
-            
+
             def update_model_next_button():
                 if len(game_config["apis"]) != 0:
-                    model_management_next_button.enable()
+                    if not all(game_config["api_test_results"].values()):
+                        model_management_next_button.disable()
+                        ui.notify("存在预设不可用",type="warning")
+                    else:
+                        model_management_next_button.enable()
                 else:
                     model_management_next_button.disable()
                 model_management_next_button.update()
@@ -66,38 +74,94 @@ def config_page():
                     manage_api_button.text = "管理模型"
                 manage_api_button.update()
 
-            def update_api_present_table():
-                rows = [{"preset":key,"url":value["base_url"],"key":value["api_key"],"model":value["model_name"]} for key, value in game_config["apis"].items()]
-                api_present_table.rows = rows if len(rows) > 0 else [{"preset":"我","url":"是","key":"示","model":"例"}]
+            async def update_api_present_table():
+                if not game_config["apis"]:
+                    api_present_table.rows = [{"preset":"我","url":"是","key":"示","model":"例","accesable":"❌"}]
+                    api_present_table.update()
+                    return
+
+                apis_to_test = {}
+                rows = []
+
+                for key, value in game_config["apis"].items():
+                    # 检查是否已有测试结果
+                    if key in game_config["api_test_results"]:
+                        is_accessible = game_config["api_test_results"][key]
+                        status = "✅" if is_accessible else "❌"
+                    else:
+                        # 首次测试或需要重新测试
+                        apis_to_test[key] = value
+                        status = "🔄"
+
+                    rows.append({
+                        "preset": key,
+                        "url": value["base_url"],
+                        "key": value["api_key"],
+                        "model": value["model_name"],
+                        "accesable": status
+                    })
+
+                api_present_table.rows = rows
+                api_present_table.update()
+                async def test_single_api(key, value):
+                    is_accessible = await test_api_key(value)
+                    game_config["api_test_results"][key] = is_accessible
+
+                tasks = [test_single_api(key, value) for key, value in game_config["apis"].items() if key in apis_to_test]
+                await asyncio.gather(*tasks)
+                rows = []
+                for key, value in game_config["apis"].items():
+                    # 检查是否已有测试结果
+                    if key in game_config["api_test_results"]:
+                        is_accessible = game_config["api_test_results"][key]
+                        status = "✅" if is_accessible else "❌"
+                    else:
+                        # 测试结果不存在，表示尚未测试
+                        status = "🔄"
+
+                    rows.append({
+                        "preset": key,
+                        "url": value["base_url"],
+                        "key": value["api_key"],
+                        "model": value["model_name"],
+                        "accesable": status
+                    })
+
+                api_present_table.rows = rows
                 api_present_table.update()
 
-            def update_elements():
-                update_api_present_table()
+            async def update_elements():
+                await update_api_present_table()
                 update_manage_api_button()
                 update_model_next_button()
-                update_api_present_table()
-            def manage_api():
+                update_add_preset_button()
+            async def manage_api():
                 nonlocal manage_api_button_down
                 if not manage_api_button_down:
                     api_present_table.selection = "multiple"
                 else:
                     # 删除
                     game_config["apis"] = {key:value for key, value in game_config["apis"].items() if key not in [i["preset"] for i in api_present_table.selected]}
+                    for i in api_present_table.selected:
+                        game_config["api_test_results"].pop(i["preset"])
                     api_present_table.selection = "none"
                 manage_api_button_down = not manage_api_button_down
-                update_elements()
+                await update_elements()
 
-            def add_api():
+            async def add_api():
+                if api_preset in game_config["apis"]:
+                    ui.notify("预设名称已存在", type="warning")
+                    return
                 game_config["apis"][api_preset] = {
                     'base_url': api_url,
                     'api_key': api_key,
                     'model_name': api_model
                 }
-                update_elements()
+                await update_elements()
 
             with ui.card().classes('w-full'):
                 with ui.row().classes('w-full'):
-                    validation = {'真的那么长吗': lambda value: len(value) < 40,"请输入文本":lambda value: len(value) > 0}
+                    validation = {'真的那么长吗': lambda value: len(value) < 60,"请输入文本":lambda value: len(value) > 0}
                     ui.input(label='预设名称', placeholder='请输入预设名称',
                         on_change=lambda e: update_api_preset(e),validation=validation)
                     ui.input(label='API地址', placeholder='请输入Base url',
@@ -112,8 +176,13 @@ def config_page():
 
             with ui.card().classes('w-full'):
                 ui.label('已添加模型：')
-                columns = [{"name":"preset",'field':"preset","label": "预设名称"}, {"name":"url",'field':"url", "label": "API地址"}, {"name":"key",'field':"key", "label": "API密钥"}, {"name":"model",'field':"model", "label": "模型名称"}]
-                rows = [{"preset":"我","url":"是","key":"示","model":"例"}]
+                columns = [
+                    {"name":"preset",'field':"preset","label": "预设名称"},
+                    {"name":"url",'field':"url", "label": "API地址"},
+                    {"name":"key",'field':"key", "label": "API密钥"},
+                    {"name":"model",'field':"model", "label": "模型名称"},
+                    {"name":"accesable","field":"accesable", "label": "可用性"}]
+                rows = [{"preset":"我","url":"是","key":"示","model":"例","accesable":"❌"}]
                 api_present_table = ui.table(columns=columns, rows=rows, row_key='preset',selection="none").classes('w-full')
                 manage_api_button = ui.button('管理模型', on_click=manage_api)
                 update_manage_api_button()
