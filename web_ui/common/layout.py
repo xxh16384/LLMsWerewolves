@@ -7,23 +7,24 @@ def menu_link(text, target):
     ui.link(text, target).classes('w-full block px-4 py-3 hover:bg-slate-700 text-gray-200 no-underline border-b border-slate-700')
 
 def theme_layout(func):
-    @wraps(func)  # <--- 2. 加上这一行！这非常关键
+    @wraps(func)
     def wrapper(*args, **kwargs):
-        # 顶部 Header
+        # 1. 先创建左侧抽屉实例并保存到变量
+        left_drawer = ui.left_drawer(value=False).classes('bg-slate-800 text-white')
+
+        # 2. 顶部 Header - 现在可以使用正确的抽屉实例
         with ui.header().classes('bg-slate-900 text-white h-16 items-center shadow-md'):
-            ui.button(icon='menu', on_click=lambda: ui.left_drawer.toggle()).props('flat color=white')
+            # 直接传递方法引用，而不是lambda表达式
+            ui.button(icon='menu', on_click=left_drawer.toggle).props('flat color=white')
             ui.label('🐺 AI 狼人杀控制台').classes('text-xl font-bold ml-4 tracking-wider')
 
-        # 左侧 Sidebar
-        with ui.left_drawer(value=True).classes('bg-slate-800 text-white'):
-            # ... 你的侧边栏代码 ...
+        # 3. 配置左侧抽屉内容
+        with left_drawer:
             ui.label('导航').classes('px-4 py-4 text-xs text-gray-400 uppercase font-bold')
-            # 这里的 menu_link 调用略...
             menu_link('⚙️ 游戏配置', '/')
 
-        # 页面主要内容区
+        # 4. 页面主要内容区
         with ui.column().classes('w-full p-6 bg-gray-50 min-h-screen'):
-            # 执行原函数
             func(*args, **kwargs)
-            
+
     return wrapper

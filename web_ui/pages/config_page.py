@@ -59,7 +59,7 @@ def config_page():
                         model_management_next_button.enable()
                 else:
                     model_management_next_button.disable()
-                model_management_next_button.enable() # 调试用
+                # model_management_next_button.enable() # 调试用
                 model_management_next_button.update()
 
             def update_manage_api_button():
