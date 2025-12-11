@@ -123,6 +123,7 @@ def api_players_check(apis_path, api_players_path) -> None:
              \n 进入辅助填充阶段。\
              \n 理论上来讲你只会进入此页面一次。"
         )
+        players = {}
         player_id = 1
         player_preset = "None"
         while True:

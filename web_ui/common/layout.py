@@ -19,6 +19,7 @@ def theme_layout(func):
             # ... 你的侧边栏代码 ...
             ui.label('导航').classes('px-4 py-4 text-xs text-gray-400 uppercase font-bold')
             # 这里的 menu_link 调用略...
+            menu_link('⚙️ 游戏配置', '/')
 
         # 页面主要内容区
         with ui.column().classes('w-full p-6 bg-gray-50 min-h-screen'):

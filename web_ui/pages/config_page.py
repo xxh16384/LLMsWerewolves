@@ -4,13 +4,14 @@ from web_ui.common.layout import theme_layout
 from web_ui.common.components import section_title
 from web_ui.common.state import game_config
 from core.tools import test_api_key
+from core.general import PLAYERDIC,PLAYERDIC_REVERSE
 import asyncio
 
 @ui.page('/')
 @theme_layout  # <--- 套用布局
 def config_page():
     section_title('游戏初始化设置')
-    
+
     with ui.stepper().props('vertical').classes('w-full') as stepper:
         with ui.step('模型管理'):
             api_preset = ''
@@ -58,6 +59,7 @@ def config_page():
                         model_management_next_button.enable()
                 else:
                     model_management_next_button.disable()
+                model_management_next_button.enable() # 调试用
                 model_management_next_button.update()
 
             def update_manage_api_button():
@@ -188,20 +190,109 @@ def config_page():
                 update_manage_api_button()
 
             with ui.stepper_navigation():
-                model_management_next_button = ui.button('下一步', on_click=stepper.next)
+                def model_management_next_step():
+                    stepper.next()
+                    update_cards()
+                model_management_next_button = ui.button('下一步', on_click=model_management_next_step)
                 update_model_next_button()
         with ui.step('玩家配置'):
-            ui.label('Mix the ingredients')
+            if "players_info" not in game_config:
+                game_config["players_info"] = {}
+            def update_player_role(num,role):
+                game_config["players_info"][str(num)]["role"] = role
+                update_cards()
+
+            def update_player_preset(num,preset):
+                game_config["players_info"][str(num)]["preset"] = preset
+                update_cards()
+
+            def player_card(num):
+                with ui.card():
+                    if str(num) not in game_config["players_info"]:
+                        game_config["players_info"][str(num)] = {"preset":None,"role":"villager"}
+                    ui.label(f"玩家{num}")
+                    with ui.row():
+                        role = PLAYERDIC.get(game_config["players_info"][str(num)]["role"])
+                        ui.select(options=[i for i in PLAYERDIC.values()],
+                                  value=role,
+                                  on_change=lambda e: update_player_role(num,PLAYERDIC_REVERSE[e.value]))
+                        preset_name = game_config["players_info"][str(num)].get("preset")
+                        ui.select(options=[i for i in game_config["apis"].keys()],
+                                  value=preset_name if preset_name in game_config["apis"].keys() else None,
+                                  on_change=lambda e: update_player_preset(num,e.value))
+            @ui.refreshable
+            def render_cards():
+                ui.label('玩家角色：')
+                with ui.row().classes('w-full wrap gap-3'):
+                    for i in range(player_num_slider.value):
+                        player_card(i+1)
+
+            def update_cards():
+                render_cards.refresh()
+
+            def update_slider():
+                update_cards()
+                if player_num_slider.value < len(game_config["players_info"]):
+                    l = len(game_config["players_info"])
+                    for i in range(player_num_slider.value,l):
+                        del game_config["players_info"][str(i+1)]
+
+
+            def validate_role_distribution()->tuple[bool, str]:
+                player_info = game_config["players_info"]
+
+                for i in range(len(player_info)):
+                    if player_info[str(i+1)]["role"] is None:
+                        return False, f"请为玩家{i+1}分配角色"
+                    if player_info[str(i+1)]["preset"] is None:
+                        return False, f"请为玩家{i+1}选择API"
+
+                role_counts = {}
+                for player_id, player_data in player_info.items():
+                    role = player_data.get("role")
+                    if role:
+                        role_counts[role] = role_counts.get(role, 0) + 1
+
+                divine_roles = ["witch", "seer", "guard"]
+                for role in divine_roles:
+                    if role_counts.get(role, 0) > 1:
+                        return False, f"神职角色 `{PLAYERDIC[role]}` 不能超过1个"
+
+                good_count = sum(role_counts.get(role, 0) for role in ["villager", "witch", "seer", "guard"])
+                wolf_count = role_counts.get("werewolf", 0)
+
+                if good_count <= wolf_count:
+                    return False, "好人数量必须大于狼人数量"
+
+                if wolf_count == 0:
+                    return False, "必须至少有1个狼人"
+
+                return True, ""
+
+            with ui.card().classes('w-full'):
+                ui.label('玩家数量：')
+                player_num_slider = ui.slider(min=3, max=16, value=5,on_change=update_slider)
+                ui.label().bind_text_from(player_num_slider, 'value')
+
+            with ui.card().classes('w-full'):
+                render_cards()
+
+            def player_management_next_step():
+                player_valided,msg = validate_role_distribution()
+                if player_valided:
+                    stepper.next()
+                else:
+                    ui.notify(msg, type='warning')
+
             with ui.stepper_navigation():
-                ui.button('下一步', on_click=stepper.next)
+                ui.button('下一步', on_click=player_management_next_step)
                 ui.button('上一步', on_click=stepper.previous).props('flat')
         with ui.step('提示词设置'):
-            ui.label('Mix the ingredients')
+            ui.label('目前只支持默认提示词哦~')
             with ui.stepper_navigation():
                 ui.button('下一步', on_click=stepper.next)
                 ui.button('上一步', on_click=stepper.previous).props('flat')
         with ui.step('完成'):
-            ui.label('Bake for 20 minutes')
             with ui.stepper_navigation():
                 ui.button('完成配置！', on_click=lambda: ui.notify('芜湖~', type='positive'))
                 ui.button('上一步', on_click=stepper.previous).props('flat')

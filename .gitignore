@@ -20,5 +20,7 @@ LLMsWerewolves.code-workspace
 web_ui/common/__pycache__/
 core/__pycache__
 /__pycache__
+/web_ui/__pycache__
+/web_ui/pages/__pycache__
 # ——————————清除所有pycache缓存——————————#
 

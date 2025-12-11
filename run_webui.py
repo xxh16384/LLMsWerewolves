@@ -7,7 +7,7 @@ from web_ui.pages import config_page
 if __name__ in {"__main__", "__mp_main__"}:
     # 全局样式调整（可选）
     ui.run(
-        title="❓", 
+        title="AI狼人杀！",
         port=8080,
         favicon="🐺",
         language="zh-CN"
