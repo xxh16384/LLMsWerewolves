@@ -21,6 +21,7 @@ from core.tools import find_max_key
 from core.game import Game
 from core.general import *
 from core.init import api_template_check, api_players_check, roles_divided
+from time import sleep
 
 
 if __name__ == "__main__":
@@ -62,25 +63,25 @@ if __name__ == "__main__":
                     game.day_night_change()
                 case "2":
                     game.guard_guarding()
-                    print("守卫保卫阶段结束")
+                    print("——————————守卫保卫阶段结束——————————")
                 case "3":
                     game.werewolf_killing()
-                    print("狼人杀人阶段结束")
+                    print("——————————狼人杀人阶段结束——————————")
                 case "4":
                     game.seer_seeing()
-                    print("预言家查验阶段结束")
+                    print("——————————预言家查验阶段结束——————————")
                 case "5":
                     game.witch_operation()
-                    print("女巫操作阶段结束")
+                    print("——————————女巫操作阶段结束——————————")
                 case "6":
                     game.day_night_change()
-                    print(f"已进入: {game}")
+                    print(f"——————————已进入: {game}——————————")
                     game.public_discussion()
-                    print("公共讨论阶段结束")
+                    print("——————————公共讨论阶段结束——————————")
                 case "7":
                     result = find_max_key(game.vote())
                     game.out([result])
-                    print("投票阶段结束")
+                    print("——————————投票阶段结束——————————")
                 case "8":
                     print(
                         f"\n ————————————————————\
@@ -100,6 +101,49 @@ if __name__ == "__main__":
             if game.game_over():
                 game.get_winner()
                 break
+
+    elif mode == "1":
+        while True:
+            print(f"【当前阶段：{game}】\n")
+            game.day_night_change()
+            print("——————————守卫保卫阶段开始——————————")
+            game.guard_guarding()
+            sleep(1)
+            print("——————————守卫保卫阶段结束——————————")
+            print("——————————狼人杀人阶段开始——————————")
+            game.werewolf_killing()
+            sleep(1)
+            print("——————————狼人杀人阶段结束——————————")
+            print("——————————预言家查验阶段开始——————————")
+            game.seer_seeing()
+            sleep(1)
+            print("——————————预言家查验阶段结束——————————")
+            print("——————————女巫操作阶段开始——————————")
+            game.witch_operation()
+            sleep(1)
+            print("——————————女巫操作阶段结束——————————")
+            game.day_night_change()
+            sleep(1)
+            print(f"——————————已进入: {game}——————————")
+            print("——————————公共讨论阶段开始——————————")
+            game.public_discussion()
+            sleep(1)
+            print("——————————公共讨论阶段结束——————————")
+            print("——————————投票阶段开始——————————")
+            result = find_max_key(game.vote())
+            game.out([result])
+            sleep(1)
+            print("——————————投票阶段结束——————————")
+            print(
+                f"\n ————————————————————————————————————————\
+                    \n 当前游戏状态:\
+                    \n 游戏名称: {game.game_name}\
+                    \n 游戏阶段: {game}\
+                    \n 存活玩家:"
+            )
+            for player in game.get_players(alive=True):
+                print(f" {player}")
+            input("请输入任意键以进入下一天：")
 
     else:
         print("无效的命令，进程自动退出...")
