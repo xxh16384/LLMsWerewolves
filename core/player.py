@@ -113,7 +113,7 @@ class Player:
 
         message_and_time.append({"role": "system", "content": f"现在是{self.game}。"})
 
-        print(f"{self} 的上下文： {message_and_time}")
+        # print(f"{self} 的上下文： {message_and_time}")
 
         response = self.client.chat.completions.create(
             model=self.game.apis[self.using_preset]["model_name"],

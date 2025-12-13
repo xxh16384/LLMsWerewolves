@@ -52,21 +52,21 @@ class Game:
 
         self.init_game()
 
-        self.routine()
-
         self.kill_tonight = []
         self.guard_tonight = []
 
+        self.routine()
+
     def routine(self):
         self.routines = [
-            [self.day_night_change(), "月亮升起"],
-            [self.guard_guarding(), "守卫醒来"],
-            [self.werewolf_killing(), "狼人醒来"],
-            [self.seer_seeing(), "预言家醒来"],
-            [self.witch_operation(), "女巫醒来"],
-            [self.day_night_change(), "太阳升起"],
-            [self.public_discussion(), "公共讨论"],
-            [self.vote_section(), "陶片逐人"],
+            [self.day_night_change, "月亮升起"],
+            [self.guard_guarding, "守卫醒来"],
+            [self.werewolf_killing, "狼人醒来"],
+            [self.seer_seeing, "预言家醒来"],
+            [self.witch_operation, "女巫醒来"],
+            [self.day_night_change, "太阳升起"],
+            [self.public_discussion, "公共讨论"],
+            [self.vote_section, "陶片逐人"],
         ]
 
     def day_night_change(self):

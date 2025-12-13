@@ -81,9 +81,20 @@ if __name__ == "__main__":
                 print(f" {player}")
             input("请输入任意键以进入下一天：")
 
-    elif mode == "11":
+    elif mode == "3":
+        circle = 0
         while True:
-            routines = game.routines
+            circle += 1
+            print(f"————————————————————第{circle}轮————————————————————")
+            routines = iter(game.routines)
+            for routine in routines:
+                cur_routine = routine
+                line_num = 10 - len(cur_routine[1])
+                left_line_num = line_num // 2
+                right_line_num = line_num - left_line_num
+                print(f"{"—"*left_line_num} {cur_routine[1]} {"—"*right_line_num}")
+                cur_routine[0]()
+                sleep(1)
 
     elif mode == "2":
 
