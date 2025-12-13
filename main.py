@@ -29,7 +29,7 @@ if __name__ == "__main__":
     apis_path = "./config/api_template.json"
     api_players_path = "./config/api_players.json"
     game_name = input("请输入游戏窗口名称：")
-    mode = input("请输入游戏模式（1、全自动模式(wip)，2、手动模式）：")
+    mode = input("请输入游戏模式（1、全自动模式，2、手动模式，3、新·全自动模式）：")
 
     api_template_check(apis_path)
     api_players_check(apis_path, api_players_path)
@@ -38,7 +38,54 @@ if __name__ == "__main__":
 
     game = Game(game_name, api_players_path, apis_path, instructions_path, roles)
 
-    if mode == "2":
+    if mode == "1":
+        while True:
+            print(f"【当前阶段：{game}】\n")
+            game.day_night_change()
+            print("——————————守卫保卫阶段开始——————————")
+            game.guard_guarding()
+            sleep(1)
+            print("——————————守卫保卫阶段结束——————————")
+            print("——————————狼人杀人阶段开始——————————")
+            game.werewolf_killing()
+            sleep(1)
+            print("——————————狼人杀人阶段结束——————————")
+            print("——————————预言家查验阶段开始——————————")
+            game.seer_seeing()
+            sleep(1)
+            print("——————————预言家查验阶段结束——————————")
+            print("——————————女巫操作阶段开始——————————")
+            game.witch_operation()
+            sleep(1)
+            print("——————————女巫操作阶段结束——————————")
+            game.day_night_change()
+            sleep(1)
+            print(f"——————————已进入: {game}——————————")
+            print("——————————公共讨论阶段开始——————————")
+            game.public_discussion()
+            sleep(1)
+            print("——————————公共讨论阶段结束——————————")
+            print("——————————投票阶段开始——————————")
+            result = find_max_key(game.vote())
+            game.out([result])
+            sleep(1)
+            print("——————————投票阶段结束——————————")
+            print(
+                f"\n ————————————————————————————————————————\
+                    \n 当前游戏状态:\
+                    \n 游戏名称: {game.game_name}\
+                    \n 游戏阶段: {game}\
+                    \n 存活玩家:"
+            )
+            for player in game.get_players(alive=True):
+                print(f" {player}")
+            input("请输入任意键以进入下一天：")
+
+    elif mode == "11":
+        while True:
+            routines = game.routines
+
+    elif mode == "2":
 
         while True:
             print(
@@ -101,49 +148,6 @@ if __name__ == "__main__":
             if game.game_over():
                 game.get_winner()
                 break
-
-    elif mode == "1":
-        while True:
-            print(f"【当前阶段：{game}】\n")
-            game.day_night_change()
-            print("——————————守卫保卫阶段开始——————————")
-            game.guard_guarding()
-            sleep(1)
-            print("——————————守卫保卫阶段结束——————————")
-            print("——————————狼人杀人阶段开始——————————")
-            game.werewolf_killing()
-            sleep(1)
-            print("——————————狼人杀人阶段结束——————————")
-            print("——————————预言家查验阶段开始——————————")
-            game.seer_seeing()
-            sleep(1)
-            print("——————————预言家查验阶段结束——————————")
-            print("——————————女巫操作阶段开始——————————")
-            game.witch_operation()
-            sleep(1)
-            print("——————————女巫操作阶段结束——————————")
-            game.day_night_change()
-            sleep(1)
-            print(f"——————————已进入: {game}——————————")
-            print("——————————公共讨论阶段开始——————————")
-            game.public_discussion()
-            sleep(1)
-            print("——————————公共讨论阶段结束——————————")
-            print("——————————投票阶段开始——————————")
-            result = find_max_key(game.vote())
-            game.out([result])
-            sleep(1)
-            print("——————————投票阶段结束——————————")
-            print(
-                f"\n ————————————————————————————————————————\
-                    \n 当前游戏状态:\
-                    \n 游戏名称: {game.game_name}\
-                    \n 游戏阶段: {game}\
-                    \n 存活玩家:"
-            )
-            for player in game.get_players(alive=True):
-                print(f" {player}")
-            input("请输入任意键以进入下一天：")
 
     else:
         print("无效的命令，进程自动退出...")

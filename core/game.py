@@ -39,9 +39,9 @@ class Game:
         self.clients = {}
 
         self.players = []
+
         self.roles = roles.copy()
         counts = sum([num for num in self.roles.values()])
-
         self.role_prompts = f"\
 这是一局有{counts}个玩家的狼人杀游戏，一共有\
 {str(self.roles["werewolf"]) + "个狼人，" if self.roles["werewolf"] > 0 else ""}\
@@ -52,8 +52,22 @@ class Game:
 
         self.init_game()
 
+        self.routine()
+
         self.kill_tonight = []
         self.guard_tonight = []
+
+    def routine(self):
+        self.routines = [
+            [self.day_night_change(), "月亮升起"],
+            [self.guard_guarding(), "守卫醒来"],
+            [self.werewolf_killing(), "狼人醒来"],
+            [self.seer_seeing(), "预言家醒来"],
+            [self.witch_operation(), "女巫醒来"],
+            [self.day_night_change(), "太阳升起"],
+            [self.public_discussion(), "公共讨论"],
+            [self.vote_section(), "陶片逐人"],
+        ]
 
     def day_night_change(self):
         """处理昼夜交替，推进游戏阶段。
@@ -235,6 +249,14 @@ class Game:
         players_pending = self.get_players()
         for player in players_pending:
             player.pub_chat(0, "请公开讨论，在此阶段你可以简短发言，解释讨论理由。")
+
+    def vote_section(self):
+        """执行白天的投票阶段，并统计投票结果，并将出局者投出。
+
+        此函数通过vote函数和out函数，统计投票结果，并投出出局者。
+        """
+        result = find_max_key(self.vote())
+        self.out([result])
 
     def vote(self) -> dict:
         """执行白天的投票阶段，并统计投票结果。

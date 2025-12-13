@@ -1,8 +1,0 @@
-{
-    "editor.wrappingStrategy": "advanced",
-    "editor.unicodeHighlight.nonBasicASCII": "inUntrustedWorkspace",
-    "editor.wordWrap": "bounded",
-    "editor.wordWrapColumn": 150,
-    "editor.formatOnSave": true,
-    "editor.defaultFormatter": "ms-python.black-formatter"
-}
