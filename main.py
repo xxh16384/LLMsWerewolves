@@ -22,9 +22,15 @@ from core.game import Game
 from core.general import *
 from core.init import *
 from time import sleep
+import os
 
 
 if __name__ == "__main__":
+    try:
+        os.makedirs("config")
+    except:
+        pass
+
     instructions_path = "./config/instructions.json"
     apis_path = "./config/api_template.json"
     api_players_path = "./config/api_players.json"
