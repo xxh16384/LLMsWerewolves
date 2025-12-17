@@ -20,7 +20,7 @@
 from core.tools import find_max_key
 from core.game import Game
 from core.general import *
-from core.init import api_template_check, api_players_check, roles_divided
+from core.init import *
 from time import sleep
 
 
@@ -28,6 +28,7 @@ if __name__ == "__main__":
     instructions_path = "./config/instructions.json"
     apis_path = "./config/api_template.json"
     api_players_path = "./config/api_players.json"
+    doc_path = "./doc/"
     game_name = input("请输入游戏窗口名称：")
     mode = input("请输入游戏模式（1、全自动模式，2、手动模式，3、新·全自动模式）：")
 
@@ -35,6 +36,8 @@ if __name__ == "__main__":
     api_players_check(apis_path, api_players_path)
 
     roles = roles_divided(api_players_path)
+
+    role_json_made(roles, doc_path, instructions_path)
 
     game = Game(game_name, api_players_path, apis_path, instructions_path, roles)
 

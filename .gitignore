@@ -11,6 +11,7 @@ config/api_players.json
 
 # ——————————  清除所有测试文件 ——————————#
 test.py
+/test
 LLMsWerewolves.code-workspace
 # ——————————  清除所有测试文件 ——————————#
 

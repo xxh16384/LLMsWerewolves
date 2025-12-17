@@ -246,3 +246,45 @@ def roles_divided(api_players_path) -> dict:
                 else:
                     print("好人数量太少了！至少要比坏人数量多一个！")
     return roles
+
+
+def role_json_made(roles: dict, doc_path: str, instructions_path: str) -> None:
+    """读取这一局存在的角色职业划分，生成这一局游戏所使用的提示词。
+
+    Args:
+        roles (dict): 一个包含本局角色及其数量的字典。
+        doc_path (str): 所有提示词的存放路径。
+        instructions_path (str): 本局所用提示词文件的路径。
+    """
+    todo = []
+    for key in roles.keys():
+        if roles[key] >= 1:
+            todo.append(key)
+
+    roles_instruction = {}
+
+    default = ""
+    path = doc_path + "general/general.yaml"
+    with open(path, "r", encoding="utf-8") as file:
+        for line in file:
+            default += line
+    for role in todo:
+        if not role in ["werewolf", "villager"]:
+            path = doc_path + "general/" + role + ".yaml"
+            with open(path, "r", encoding="utf-8") as file:
+                for line in file:
+                    default += line
+    roles_instruction["general"] = default
+
+    for role in todo:
+        path = doc_path + role + ".yaml"
+        result = ""
+        with open(path, "r", encoding="utf-8") as file:
+            for line in file:
+                result += line
+        roles_instruction[role] = result
+
+    roles_json = json.dumps(roles_instruction, ensure_ascii=False, indent=4)
+
+    with open(instructions_path, "w", encoding="utf-8") as f:
+        f.write(roles_json)
