@@ -197,19 +197,33 @@ def roles_divided(api_players_path) -> dict:
         roles["villager"] += 1
         return f"成功减少一个{PLAYERDIC[role]}"
 
+    def make_role(choice):
+        if len(choice) == 1:
+            role = choices[choice]
+            print(add_role(role))
+        elif len(choice) == 2:
+            choice = choice[1]
+            role = choices[choice]
+            print(remove_role(role))
+        else:
+            print("无效输入。")
+
+    def count(therole):
+        return sum([roles[role] for role in therole])
+
     players = read_json(api_players_path)
     counts = len(players)
-    roles = {}
-    roles["werewolf"] = 3
-    roles["seer"] = 1
-    roles["witch"] = 1
-    roles["guard"] = 1
+    roles = {"werewolf": 3, "seer": 1, "witch": 1, "guard": 1, "hunter": 1}
+    choices = {"1": "werewolf", "2": "seer", "3": "witch", "4": "guard", "5": "hunter"}
+    bads = ["werewolf"]
+    goods = ["villager", "seer", "witch", "guard", "hunter"]
+    special = bads + goods
+    special.remove("villager")
+
     while True:
-        roles["villager"] = (
-            counts - roles["werewolf"] - roles["seer"] - roles["witch"] - roles["guard"]
-        )
-        bad_guy = roles["werewolf"]
-        good_guy = roles["villager"] + roles["seer"] + roles["witch"] + roles["guard"]
+        roles["villager"] = counts - count(special)
+        bad_guy = count(bads)
+        good_guy = count(goods)
         print(
             f"\n ——————————————————\
               \n 请输入这一局的职业划分，\
@@ -218,33 +232,20 @@ def roles_divided(api_players_path) -> dict:
               \n [2/12]预言家数量 : {roles["seer"]:2d}\
               \n [3/13] 女巫 数量 : {roles["witch"]:2d}\
               \n [4/14] 守卫 数量 : {roles["guard"]:2d}\
+              \n [5/15] 猎人 数量 : {roles["hunter"]:2d}\
               \n [----] 平民 数量 : {roles["villager"]:2d}\
               \n [0]    完成职业划分"
         )
         choice = input("请输入：")
 
         match (choice):
-            case "1":
-                print(add_role("werewolf"))
-            case "2":
-                print(add_role("seer"))
-            case "3":
-                print(add_role("witch"))
-            case "4":
-                print(add_role("guard"))
-            case "11":
-                print(remove_role("werewolf"))
-            case "12":
-                print(remove_role("seer"))
-            case "13":
-                print(remove_role("witch"))
-            case "14":
-                print(remove_role("guard"))
             case "0":
                 if good_guy > bad_guy:
                     break
                 else:
                     print("好人数量太少了！至少要比坏人数量多一个！")
+            case _:
+                make_role(choice)
     return roles
 
 

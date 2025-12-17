@@ -53,6 +53,7 @@ class Game:
         self.init_game()
 
         self.kill_tonight = []
+        self.poisoned_tonight = []
         self.guard_tonight = []
 
         self.routine()
@@ -83,7 +84,8 @@ class Game:
             if self.kill_tonight:
                 self.kill_tonight = list(set(self.kill_tonight))
                 self.broadcast(f"昨晚{str(self.kill_tonight)[1:-1]}号玩家被杀了")
-                self.out(self.kill_tonight)
+                self.out(self.kill_tonight, "killed")
+                self.out(self.poisoned_tonight, "poisoned")
                 self.kill_tonight = []
             else:
                 self.broadcast(f"昨晚是个平安夜，没有人被杀")
@@ -235,7 +237,7 @@ class Game:
                 record_witch(
                     f"在{self.get_day()}的晚上，你选择了毒杀{int(poisoned[-1])}号玩家。"
                 )
-                self.kill_tonight.append(int(poisoned[-1]))
+                self.poisoned_tonight.append(int(poisoned[-1]))
                 witch.poison = False
         else:
             record_witch(f"在{self.get_day()}的晚上，你今晚没有毒，所以没有毒杀人。")
@@ -280,7 +282,7 @@ class Game:
                 result[int(voted[-1])] += 1
         return result
 
-    def out(self, player_ids: list):
+    def out(self, player_ids: list, ways: str = "voted"):
         """将一个或多个玩家标记为出局。
 
         此函数将指定ID列表中的玩家的存活状态设置为False，
@@ -298,9 +300,21 @@ class Game:
         players_pending = self.get_players_by_ids(player_ids)
         if not players_pending:
             raise ValueError("出局失败")
-        for i in players_pending:
-            i.alive = False
-        self.broadcast(f"{str(player_ids)[1:-1]}号玩家出局")
+        for outed_player in players_pending:
+            outed_player.alive = False
+            self.broadcast(f"{str(outed_player)}号玩家出局")
+            try:
+                if outed_player.revenge and ways != "poisoned":
+                    bcmessage = f"{outed_player.id}是猎人！他将在死前杀死一名任意玩家！"
+                    pcmessage = "你要杀死谁？要杀死的玩家编号请用[]包围，例如'我要[7]号玩家'。可以简短的给出理由。"
+                    self.broadcast(bcmessage)
+                    outed_player.private_chat(0, pcmessage)
+                    target = extract_numbers_from_brackets(
+                        outed_player.messages[-1]["content"]
+                    )
+                    self.out(target, "killed")
+            except:
+                pass
 
     def no_out(self, player_ids: list):
         """将一个或多个出局的玩家重新标记为存活。

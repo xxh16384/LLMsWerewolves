@@ -94,11 +94,13 @@ if __name__ == "__main__":
         circle = 0
         while True:
             circle += 1
-            print(f"————————————————————第{circle}轮————————————————————")
+            print(
+                f"————————————————————————————————————————第{circle}轮————————————————————————————————————————"
+            )
             routines = iter(game.routines)
             for routine in routines:
                 cur_routine = routine
-                line_num = 10 - len(cur_routine[1])
+                line_num = 80 - len(cur_routine[1])
                 left_line_num = line_num // 2
                 right_line_num = line_num - left_line_num
                 print(f"{"—"*left_line_num} {cur_routine[1]} {"—"*right_line_num}")
