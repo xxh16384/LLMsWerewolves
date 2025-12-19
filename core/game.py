@@ -55,6 +55,7 @@ class Game:
         self.kill_tonight = []
         self.poisoned_tonight = []
         self.guard_tonight = []
+        self.last_guard = 0
 
         self.routine()
 
@@ -79,14 +80,19 @@ class Game:
         """
         self.stage += 1
         days, morning_dusk = self.get_game_stage()
-        self.guard_tonight = []
+        if self.guard_tonight:
+            self.last_guard = self.guard_tonight[0]
+            self.guard_tonight = []
+        else:
+            self.last_guard = 0
         if morning_dusk == 1 and days > 1:
-            if self.kill_tonight:
-                self.kill_tonight = list(set(self.kill_tonight))
-                self.broadcast(f"昨晚{str(self.kill_tonight)[1:-1]}号玩家被杀了")
+            if self.kill_tonight or self.poisoned_tonight:
+                self.died_tonight = list(set(self.kill_tonight + self.poisoned_tonight))
+                self.broadcast(f"昨晚{str(self.died_tonight)[1:-1]}号玩家被杀了")
                 self.out(self.kill_tonight, "killed")
                 self.out(self.poisoned_tonight, "poisoned")
                 self.kill_tonight = []
+                self.poisoned_tonight = []
             else:
                 self.broadcast(f"昨晚是个平安夜，没有人被杀")
 
@@ -110,7 +116,7 @@ class Game:
         guard = guard[0]
 
         talk_guard(
-            "你今晚要保护谁？要保护的玩家编号请用[]包围，若不保护人则输出[0]，例如'我要保护[7]号玩家'或'我不想保护人，[0]'。可以简短的给出理由。"
+            f"你今晚要保护谁？要保护的玩家编号请用[]包围，若不保护人则输出[0]。注意，你不可连续两晚保护同一个人{"" if self.last_guard == 0 else "，你昨晚保护了["+str(self.last_guard)+"]号玩家，因此你今晚无法保护这个玩家"}。例如'我要保护[7]号玩家'或'我不想保护人，[0]'。可以简短的给出理由。"
         )
         target = extract_numbers_from_brackets(guard.messages[-1]["content"])
         if target and target[0] != 0:
@@ -179,12 +185,15 @@ class Game:
             return
         seer = seer[0]
         talk_seer(
-            "你今晚要查谁？要查询的玩家编号请用[]包围，例如'我要查询[7]号玩家'。可以简短的给出理由。"
+            "你今晚要查谁？要查询的玩家编号请用[]包围，例如'我要查询[7]号玩家'，你无论如何都必须要查询一个人。可以简短的给出理由。"
         )
         target = extract_numbers_from_brackets(seer.messages[-1]["content"])
-        record_seer(
-            f"在{self.get_day()}的晚上，你查的玩家是{target}号，他的身份是{self.get_players_by_ids(target)[0].role}。"
-        )
+        if target and target != 0:
+            record_seer(
+                f"在{self.get_day()}的晚上，你查的玩家是{target}号，他的身份是{self.get_players_by_ids(target)[0].role}。"
+            )
+        else:
+            record_seer(f"在{self.get_day()}的晚上，你没有查询任何人的身份。")
 
     def witch_operation(self):
         """处理女巫的夜晚操作，包括使用解药和毒药。
@@ -311,6 +320,9 @@ class Game:
                     outed_player.private_chat(0, pcmessage)
                     target = extract_numbers_from_brackets(
                         outed_player.messages[-1]["content"]
+                    )
+                    self.broadcast(
+                        f"{outed_player.id}号玩家作为猎人，在死后杀死了{target}号玩家！"
                     )
                     self.out(target, "killed")
             except:

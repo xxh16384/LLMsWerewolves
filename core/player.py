@@ -98,13 +98,13 @@ class Player:
         prompt0 = prompt
         if if_pub:
             prompt = (
-                f"\n此前你能得知的玩家发言以及公共信息如下：{str(pub_messages)}...注意：你现在在公共发言阶段，你的所有输出会被所有玩家听到，请直接口语化的输出你想表达的信息，不要暴露你的意图。（连括号中的内容也会被看到）"
-                + prompt
+                prompt
+                + f"\n此前你能得知的玩家发言以及公共信息如下：{str(pub_messages)}。注意：你现在在公共发言阶段，你的**所有输出**都会被**所有玩家**听到，此阶段不允许私聊。如果你有想要隐瞒的信息，请不要暴露你的意图，同理，也不要太信任他人在公共频道说的话。你不允许使用任何括号括住你的任何发言。"
             )
         else:
             prompt = (
-                f"\n此前你能得知的玩家发言以及公共信息如下：{str(pub_messages)}...注意：你现在在私聊阶段，你的输出只会被上帝听到。（如果你是狼人，你的聊天还会被同阵营的玩家听到）"
-                + prompt
+                prompt
+                + f"\n此前你能得知的玩家发言以及公共信息如下：{str(pub_messages)}。注意：你现在在私聊阶段，你的输出只会被上帝听到。如果你是狼人，你的聊天还会被同阵营的玩家听到。"
             )
 
         self.messages.append({"role": "user", "content": prompt})
@@ -165,6 +165,9 @@ class Player:
             if reasoning_messages
             else collected_messages
         )
+        if if_pub:
+            collected_messages = "【公共频道发言】" + collected_messages
+
         Context(self.game, self.id, collected_messages, visible_ids)
 
         self.messages.append({"role": "assistant", "content": collected_messages})
