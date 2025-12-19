@@ -51,6 +51,7 @@ if __name__ == "__main__":
 
     if mode == "3":
         circle = 0
+        game_end = False
         while True:
             circle += 1
             print(
@@ -69,7 +70,9 @@ if __name__ == "__main__":
                 cur_routine[0]()
                 sleep(1)
                 if game.get_winner():
-                    break
+                    game_end = True
+            if game_end:
+                break
 
     else:
         print("无效的命令，进程自动退出...")

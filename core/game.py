@@ -371,7 +371,7 @@ class Game:
         else:
             return 0
 
-    def get_winner(self) -> str:
+    def get_winner(self) -> str | None:
         """在游戏结束后，判断并宣布胜利方。
 
         该函数首先检查游戏是否结束。如果已结束，则根据场上存活的
@@ -401,6 +401,7 @@ class Game:
                     self.get_players(t="id", alive=False),
                 )
                 return "好人"
+        return None
 
     def init_game(self):
         """初始化游戏的核心组件，包括玩家和上下文。
