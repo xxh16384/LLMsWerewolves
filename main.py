@@ -36,9 +36,9 @@ if __name__ == "__main__":
     api_players_path = "./config/api_players.json"
     doc_path = "./doc/"
     game_name = input("请输入游戏窗口名称：")
-    mode = input(
-        "请输入游戏模式（1、全自动模式(WIP)，2、手动模式(WIP)，3、新·全自动模式）："
-    )
+    # mode = input(
+    #     "请输入游戏模式（1、全自动模式(WIP)，2、手动模式(WIP)，3、新·全自动模式）："
+    # )
 
     api_template_check(apis_path)
     api_players_check(apis_path, api_players_path)
@@ -49,7 +49,8 @@ if __name__ == "__main__":
 
     game = Game(game_name, api_players_path, apis_path, instructions_path, roles)
 
-    if mode == "3":
+    # if mode == "3":
+    if True:
         circle = 0
         game_end = False
         while True:
@@ -69,7 +70,7 @@ if __name__ == "__main__":
                 print(f"{"—"*left_line_num} {cur_routine[1]} {"—"*right_line_num}")
                 cur_routine[0]()
                 sleep(1)
-                if game.get_winner():
+                if game.gg or game.get_winner():
                     game_end = True
             if game_end:
                 break

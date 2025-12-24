@@ -2,7 +2,12 @@ import logging
 import os
 from time import time
 from random import choice
-from .tools import read_json, extract_numbers_from_brackets, find_max_key, makeDic
+from .tools import (
+    read_json,
+    find_max_key,
+    makeDic,
+    read_reply,
+)
 from .context import Context
 from .player import Player
 from .general import *
@@ -56,6 +61,8 @@ class Game:
         self.poisoned_tonight = []
         self.guard_tonight = []
         self.last_guard = 0
+
+        self.gg = False
 
         self.routine()
 
@@ -118,7 +125,7 @@ class Game:
         talk_guard(
             f"你今晚要保护谁？要保护的玩家编号请用[]包围，若不保护人则输出[0]。注意，你不可连续两晚保护同一个人{"" if self.last_guard == 0 else "，你昨晚保护了["+str(self.last_guard)+"]号玩家，因此你今晚无法保护这个玩家"}。例如'我要保护[7]号玩家'或'我不想保护人，[0]'。可以简短的给出理由。"
         )
-        target = extract_numbers_from_brackets(guard.messages[-1]["content"])
+        target = read_reply(guard)
         if target and target[0] != 0:
             record_guard(f"在{self.get_day()}的晚上，你保护了{target}号玩家。")
         self.guard_tonight.append(target[0])
@@ -154,7 +161,7 @@ class Game:
         result = makeDic(self.get_players())
 
         for wolf in wolves:
-            ToKilled = extract_numbers_from_brackets(wolf.messages[-1]["content"])
+            ToKilled = read_reply(wolf)
             if ToKilled and int(ToKilled[-1]) in self.get_players("id"):
                 result[int(ToKilled[-1])] += 1
 
@@ -187,7 +194,7 @@ class Game:
         talk_seer(
             "你今晚要查谁？要查询的玩家编号请用[]包围，例如'我要查询[7]号玩家'，你无论如何都必须要查询一个人。可以简短的给出理由。"
         )
-        target = extract_numbers_from_brackets(seer.messages[-1]["content"])
+        target = read_reply(seer)
         if target and target != 0:
             record_seer(
                 f"在{self.get_day()}的晚上，你查的玩家是{target}号，他的身份是{self.get_players_by_ids(target)[0].role}。"
@@ -221,7 +228,7 @@ class Game:
                 talk_witch(
                     f"在{self.get_day()}的晚上，{victim}号玩家被杀了，你可以选择救他或者不救，选择结果用[]包围，救请写[1]，不救请写[0]，你可以简短的给出理由。"
                 )
-                cured = extract_numbers_from_brackets(witch.messages[-1]["content"])
+                cured = read_reply(witch)
                 if cured and int(cured[-1]):
                     witch.antidote = True
                     record_witch(
@@ -240,7 +247,7 @@ class Game:
             talk_witch(
                 f"你可以选择毒杀别人，选择结果用[]包围，毒杀结果请写在[]中，例如你要杀1号玩家，请写[1]，不毒杀请写[0]。",
             )
-            poisoned = extract_numbers_from_brackets(witch.messages[-1]["content"])
+            poisoned = read_reply(witch)
             if int(poisoned[-1]):
                 witch.poison = True
                 record_witch(
@@ -285,8 +292,8 @@ class Game:
                 "请投票，投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以简短发言，解释投票理由。",
             )
         result = makeDic(players_pending)
-        for i in players_pending:
-            voted = extract_numbers_from_brackets(i.messages[-1]["content"])
+        for player in players_pending:
+            voted = read_reply(player)
             if voted and int(voted[-1]) in self.get_players("id"):
                 result[int(voted[-1])] += 1
         return result
@@ -313,20 +320,22 @@ class Game:
             outed_player.alive = False
             self.broadcast(f"{str(outed_player)}号玩家出局")
             try:
+                if outed_player.joker and ways == "voted":
+                    self.special_win(outed_player, "joker")
                 if outed_player.revenge and ways != "poisoned":
                     bcmessage = f"{outed_player.id}是猎人！他将在死前杀死一名任意玩家！"
                     pcmessage = "你要杀死谁？要杀死的玩家编号请用[]包围，例如'我要[7]号玩家'。可以简短的给出理由。"
                     self.broadcast(bcmessage)
                     outed_player.private_chat(0, pcmessage)
-                    target = extract_numbers_from_brackets(
-                        outed_player.messages[-1]["content"]
-                    )
+                    target = read_reply(outed_player)
                     self.broadcast(
                         f"{outed_player.id}号玩家作为猎人，在死后杀死了{target}号玩家！"
                     )
                     self.out(target, "killed")
             except:
                 pass
+            if self.gg:
+                break
 
     def no_out(self, player_ids: list):
         """将一个或多个出局的玩家重新标记为存活。
@@ -392,6 +401,7 @@ class Game:
                     f"游戏结束，狼人获胜",
                     self.get_players(t="id", alive=False),
                 )
+                print("【系统】游戏结束！狼人阵营获胜。")
                 return "狼人"
             elif len(self.get_players(alive=True, role="werewolf")) == 0:
                 Context(
@@ -400,8 +410,22 @@ class Game:
                     f"游戏结束，好人获胜",
                     self.get_players(t="id", alive=False),
                 )
+                print("【系统】游戏结束！好人阵营获胜。")
                 return "好人"
         return None
+
+    def special_win(self, player_id: int, way: str) -> None:
+        """管理特殊胜利的方式，比如说小丑被投票出局。
+
+        该函数
+
+        Returns:
+
+        """
+        match (way):
+            case "joker":
+                print("【系统】游戏结束！小丑单独获胜。")
+                self.gg = True
 
     def init_game(self):
         """初始化游戏的核心组件，包括玩家和上下文。

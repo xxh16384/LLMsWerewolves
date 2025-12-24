@@ -180,7 +180,7 @@ def roles_divided(api_players_path) -> dict:
     def add_role(role):
         if roles["villager"] <= 0:
             return "平民数量不足，无法增加！"
-        if role in ("seer", "witch", "guard") and roles[role] >= 1:
+        if role in SINGLE_ROLE and roles[role] >= 1:
             return f"{PLAYERDIC[role]}的数量无法大于一个！"
 
         roles[role] += 1
@@ -199,53 +199,71 @@ def roles_divided(api_players_path) -> dict:
 
     def make_role(choice):
         if len(choice) == 1:
-            role = choices[choice]
+            role = ROLE_INDEX[choice]
             print(add_role(role))
         elif len(choice) == 2:
             choice = choice[1]
-            role = choices[choice]
+            role = ROLE_INDEX[choice]
             print(remove_role(role))
         else:
             print("无效输入。")
+
+    def get_role_by_faction(faction):
+        return [role for role in LEGAL_ROLE.keys() if LEGAL_ROLE[role] == faction]
+
+    def roles_divided_string(role):
+        if role == "villager":
+            return f"[----] 平民 数量 : {roles["villager"]:2d}"
+        add_role_id = reverse_choices[role]
+        remove_role_id = "1" + add_role_id
+        return f"[{add_role_id}/{remove_role_id}]{PLAYERDIC[role]:^5}数量：{roles[role]:2d}"
 
     def count(therole):
         return sum([roles[role] for role in therole])
 
     players = read_json(api_players_path)
     counts = len(players)
-    roles = {"werewolf": 3, "seer": 1, "witch": 1, "guard": 1, "hunter": 1}
-    choices = {"1": "werewolf", "2": "seer", "3": "witch", "4": "guard", "5": "hunter"}
-    bads = ["werewolf"]
-    goods = ["villager", "seer", "witch", "guard", "hunter"]
-    special = bads + goods
+    roles = {
+        "werewolf": 3,
+        "seer": 1,
+        "witch": 1,
+        "guard": 1,
+        "hunter": 1,
+        "joker": 0,
+        "villager": -1,
+    }
+    reverse_choices = {ROLE_INDEX[i]: i for i in ROLE_INDEX.keys()}
+    bads = get_role_by_faction("bad")
+    goods = get_role_by_faction("good")
+    neutral = get_role_by_faction("neutral")
+    special = bads + goods + neutral
     special.remove("villager")
 
     while True:
         roles["villager"] = counts - count(special)
         bad_guy = count(bads)
         good_guy = count(goods)
+        neutral_guy = count(neutral)
+
         print(
             f"\n ——————————————————\
               \n 请输入这一局的职业划分，\
-              \n [a/b]中，a代表加1人，b代表减1人\
-              \n [1/11] 狼人 数量 : {roles["werewolf"]:2d}\
-              \n [2/12]预言家数量 : {roles["seer"]:2d}\
-              \n [3/13] 女巫 数量 : {roles["witch"]:2d}\
-              \n [4/14] 守卫 数量 : {roles["guard"]:2d}\
-              \n [5/15] 猎人 数量 : {roles["hunter"]:2d}\
-              \n [----] 平民 数量 : {roles["villager"]:2d}\
-              \n [0]    完成职业划分"
+              \n [a/b]中，a代表加1人，b代表减1人"
         )
+        for role in LEGAL_ROLE.keys():
+            print(roles_divided_string(role))
+        print(f"\n [0]    完成职业划分")
+
         choice = input("请输入：")
 
-        match (choice):
-            case "0":
-                if good_guy > bad_guy:
-                    break
-                else:
-                    print("好人数量太少了！至少要比坏人数量多一个！")
-            case _:
-                make_role(choice)
+        if choice == "0":
+            if good_guy > bad_guy + neutral_guy:
+                break
+            else:
+                print("好人数量太少了！至少要比坏人加中立职业的数量多一个！")
+        else:
+            make_role(choice)
+
     return roles
 
 

@@ -87,8 +87,7 @@ def makeDic(array: list) -> dict:
 
 
 async def test_api_key(api_preset: dict) -> bool:
-    """
-    测试API密钥是否有效
+    """测试API密钥是否有效
 
     Args:
         api_preset (dict): 包含API配置的字典，必须包含"api_key"、"base_url"和"model_name"键
@@ -119,8 +118,7 @@ async def test_api_key(api_preset: dict) -> bool:
 
 
 async def get_models(api_preset: dict) -> list:
-    """
-    获取API密钥对应的模型
+    """获取API密钥对应的模型
 
     Args:
         api_preset (dict): 包含API配置的字典，必须包含"api_key"、"base_url"和"model_name"键
@@ -143,3 +141,16 @@ async def get_models(api_preset: dict) -> list:
         return models
     except:
         return []
+
+
+def read_reply(player) -> str:
+    """用于便捷获取玩家获取的信息
+
+    Args:
+        player (Player): 一个玩家对象。
+
+    Returns:
+        str: 该玩家上次的回答。
+    """
+
+    return extract_numbers_from_brackets(player.messages[-1]["content"])
