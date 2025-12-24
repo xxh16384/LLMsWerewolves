@@ -264,6 +264,10 @@ def roles_divided(api_players_path) -> dict:
         else:
             make_role(choice)
 
+    for role in LEGAL_ROLE.keys():
+        if roles[role] == 0:
+            del roles[role]
+
     return roles
 
 
@@ -288,7 +292,7 @@ def role_json_made(roles: dict, doc_path: str, instructions_path: str) -> None:
         for line in file:
             default += line
     for role in todo:
-        if not role in ["werewolf", "villager"]:
+        if not role in NORMAL_ROLE:
             path = doc_path + "general/" + role + ".yaml"
             with open(path, "r", encoding="utf-8") as file:
                 for line in file:

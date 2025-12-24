@@ -34,7 +34,9 @@ class Player:
         pre_instruction = f"你是{self.id}号玩家，" + self.game.instructions[self.role]
         if self.role == "werewolf":
             wolfs = self.game.get_players("id", alive=False, role="werewolf")
-            pre_instruction += f"\n以下玩家是狼人{str(wolfs)[1:-1]}，是你和你的队友"
+            wolfs.remove(self.id)
+            pre_instruction += f"\n以下玩家是你的队友，他们也是狼人：{str(wolfs)}。"
+        print(pre_instruction)
         self.messages.append({"role": "system", "content": pre_instruction})
 
     def pub_chat(self, source_id: int, content: str):

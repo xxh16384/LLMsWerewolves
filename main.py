@@ -17,7 +17,6 @@
 胜利方并终止程序。用户也可以随时输入 `-1` 来手动结束游戏。
 """
 
-from core.tools import find_max_key
 from core.game import Game
 from core.general import *
 from core.init import *

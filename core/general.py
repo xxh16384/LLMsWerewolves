@@ -27,7 +27,7 @@ ROLE_INDEX = {
 }
 
 # 玩家对应表，用于输出每个职业的中文名
-# 如果你设计了新的职业，建议你在这里写下它们对应的中文名字
+# 如果你设计了新的职业，建议你在这里写下它们对应的中文名字，不会发送给AI
 PLAYERDIC = {
     "werewolf": "狼人",
     "villager": "平民",
@@ -45,4 +45,10 @@ SINGLE_ROLE = [
     "witch",
     "guard",
     "joker",
+]
+
+# 简单的职业，不需要通用提示词
+NORMAL_ROLE = [
+    "villager",
+    "werewolf",
 ]
