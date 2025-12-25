@@ -362,9 +362,9 @@ class Game(BasicGame):
         Returns:
             str: 返回胜利阵营的名称 ("狼人" 或 "好人")。
         """
-        bad_people = len(self.get_players_by_faction(faction="bad"))
-        good_people = len(self.get_players_by_faction(faction="good"))
-        neutral_people = len(self.get_players_by_faction(faction="neutral"))
+        bad_people = len(self.get_players_by_factions(faction="bad"))
+        good_people = len(self.get_players_by_factions(faction="good"))
+        neutral_people = len(self.get_players_by_factions(faction="neutral"))
         if bad_people >= good_people + neutral_people:
             if (
                 "whitewolf" in self.roles
