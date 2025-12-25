@@ -46,6 +46,7 @@ class Game(BasicGame):
 
         # 初始化游戏状态
         self.gg = False
+        self.police = -1
         self.routine()
 
         # 初始化游戏上下文，玩家以及其使用的API
@@ -73,10 +74,12 @@ class Game(BasicGame):
             ((self.day_night_change, "月亮升起"), True),
             ((self.guard_guarding, "守卫醒来"), check("guard")),
             ((self.werewolf_killing, "狼人醒来"), check("werewolf")),
+            ((self.whitewolf_killing, "白狼醒来"), check("whitewolf")),
             ((self.seer_seeing, "预言家醒来"), check("seer")),
             ((self.witch_operation, "女巫醒来"), check("witch")),
             ((self.day_night_change, "太阳升起"), True),
             ((self.public_discussion, "公共讨论"), True),
+            ((self.vote_police_section, "警长投票"), True),
             ((self.vote_section, "陶片逐人"), True),
         )
 
@@ -125,8 +128,11 @@ class Game(BasicGame):
 
         def record_werewolf(message: str):
             Context(self, 0, message, self.get_players(t="id", role="werewolf"))
+            Context(self, 0, message, self.get_players(t="id", role="whitewolf"))
 
-        wolves = self.get_players(role="werewolf")
+        # wolves = self.get_players(role="werewolf")
+
+        wolves = self.get_players_by_factions(faction="bad")
 
         if not wolves:
             return
@@ -154,6 +160,38 @@ class Game(BasicGame):
                 self.kill_tonight.append(killed)
         else:
             record_werewolf(f"在{self.get_day()}的晚上，狼人没有选择任何人要杀。")
+
+    def whitewolf_killing(self):
+        """处理白狼的夜晚杀人行动。
+
+        此函数记录白狼的思考和投票，以决定当晚要击杀的玩家。
+        它会收集白狼的投票，并将其记录到当晚的死亡候选列表中。
+        如果目标未被守卫守护，则会最终被标记为死亡。
+        """
+
+        def talk_whitewolf(message: str):
+            whitewolf.private_chat(0, message)
+
+        def record_whitewolf(message: str):
+            Context(self, 0, message, self.get_players(t="id", role="whitewolf"))
+
+        if self.get_day() % 2 == 1:
+            return
+
+        whitewolf = self.get_players(role="whitewolf")
+        if not whitewolf:
+            return
+        whitewolf = whitewolf[0]
+        talk_whitewolf(
+            "你是白狼，今晚你可以使用白狼之刃，杀死任一一名玩家，你可以为了削弱好人势力来杀死好人，也可以为了特殊胜利而杀死你的狼人队友。你今晚要杀谁？要查询的玩家编号请用[]包围，例如'我要杀死[7]号玩家'，你无论如何都必须要杀死一个人。可以简短的给出理由。"
+        )
+        target = read_reply(whitewolf)
+        if target and target != 0:
+            record_whitewolf(
+                f"在{self.get_day()}的晚上，你使用白狼之刃，杀死了{target}号玩家。"
+            )
+        else:
+            record_whitewolf(f"在{self.get_day()}的晚上，你没有杀死任何人。")
 
     def seer_seeing(self):
         """处理预言家的夜晚查验行动。
@@ -253,14 +291,14 @@ class Game(BasicGame):
             ValueError: 如果传入的玩家ID列表无效或找不到对应玩家。
         """
         if not player_ids:
-            self.broadcast("出局失败")
+            self.broadcast(f"在{self}的投票阶段，由于出现了平票现象，所以出局失败。")
             return
         players_pending = self.get_players_by_ids(player_ids)
         if not players_pending:
             raise ValueError("出局失败")
         for outed_player in players_pending:
             outed_player.alive = False
-            self.broadcast(f"{str(outed_player)}号玩家出局")
+            self.broadcast(f"在{self}的投票阶段，{str(outed_player)}号玩家出局。")
             try:
                 if outed_player.joker and ways == "voted":
                     self.special_win(outed_player, "joker")

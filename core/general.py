@@ -10,6 +10,7 @@ LEGAL_ROLE = {
     "guard": "good",
     "hunter": "good",
     "joker": "neutral",
+    "whitewolf": "bad",
 }
 
 # 职业索引，在开局定义职业时，每个职业对应的编号
@@ -45,6 +46,7 @@ SINGLE_ROLE = [
     "witch",
     "guard",
     "joker",
+    "whitewolf",
 ]
 
 # 简单的职业，不需要通用提示词

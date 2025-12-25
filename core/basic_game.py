@@ -88,34 +88,74 @@ class BasicGame:
         for player in players_pending:
             player.pub_chat(0, "请公开讨论，在此阶段你可以简短发言，解释讨论理由。")
 
+    def vote_police_section(self):
+        """执行白天的警徽投票阶段，并统计投票结果，若有人得票最多且没有平票，即为警长。
+
+        此函数通过vote函数和police函数，统计投票结果，并投出警长。
+        """
+        result = find_max_key(self.vote(type="police"))
+        self.police([result])
+
     def vote_section(self):
         """执行白天的投票阶段，并统计投票结果，并将出局者投出。
 
         此函数通过vote函数和out函数，统计投票结果，并投出出局者。
         """
-        result = find_max_key(self.vote())
+        result = find_max_key(self.vote(type="out"))
         self.out([result])
 
-    def vote(self) -> dict:
+    def police(self, player_ids: list):
+        """通过投票结果，决定今天的警长。
+
+        此函数通过导入的投票结果，判断是否出现警长，并且标记其为警长。
+
+        Args:
+            player_ids (list): 需要成为警长的玩家ID列表。
+        """
+        if not player_ids:
+            self.broadcast(f"在{self}的警徽阶段，出现了平票现象，没有任何人成为警长。")
+            return
+        players_pending = self.get_players_by_ids(player_ids)
+        if not players_pending:
+            raise ValueError("警徽投票失败")
+        policeman = players_pending[0].id
+        self.police = policeman
+        self.broadcast(
+            f"在{self}的警徽阶段，{self.police}号成为了警长。他在这一天的投票阶段持有两张票。"
+        )
+
+    def vote(self, type: str) -> dict:
         """执行白天的投票阶段，并统计投票结果。
 
         此函数向所有存活的玩家广播投票指示，收集每个玩家的投票选择。
         然后统计所有投票，确定每个被投票玩家的得票数。
+
+        Args:
+            type (str): 投票的目的，警徽投票或者出局投票。
 
         Returns:
             dict: 一个字典，键为被投票的玩家ID，值为该玩家获得的票数。
         """
         players_pending = self.get_players()
         for player in players_pending:
-            player.pub_chat(
-                0,
-                "请投票，投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以简短发言，解释投票理由。",
-            )
+            if type == "out":
+                player.pub_chat(
+                    0,
+                    "现在要将一个玩家投票出局。请投票，投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以简短发言，解释投票理由。",
+                )
+            elif type == "police":
+                player.pub_chat(
+                    0,
+                    "现在要投票决出一个警长。请投票，投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以简短发言，解释投票理由。",
+                )
         result = makeDic(players_pending)
         for player in players_pending:
             voted = read_reply(player)
             if voted and int(voted[-1]) in self.get_players("id"):
-                result[int(voted[-1])] += 1
+                if type == "out" and player.id == self.police:
+                    result[int(voted[-1])] += 2
+                else:
+                    result[int(voted[-1])] += 1
         return result
 
     def no_out(self, player_ids: list):
@@ -200,6 +240,29 @@ class BasicGame:
                     return [i for i in self.players if i.role == role]
                 elif t == "id":
                     return [i.id for i in self.players if i.role == role]
+
+    def get_players_by_factions(self, t: str = "object", faction: str = "bad") -> list:
+        """根据玩家阵营获取对应的玩家ID或对象列表。
+
+        Args:
+            t (str, optional): 返回列表的元素类型。'object' 表示返回玩家对象，
+                'id' 表示返回玩家ID。默认为 'object'。
+            faction (str, optional): 玩家的阵营。
+
+        Returns:
+            list: 包含与阵营匹配的Player的ID或对象的列表。
+        """
+        if t == "object":
+            players_pending = [
+                player for player in self.players if LEGAL_ROLE[player.role] == faction
+            ]
+        elif t == "id":
+            players_pending = [
+                player.id
+                for player in self.players
+                if LEGAL_ROLE[player.role] == faction
+            ]
+        return players_pending
 
     def get_players_by_ids(self, ids: list) -> list:
         """根据玩家ID列表获取对应的玩家对象列表。

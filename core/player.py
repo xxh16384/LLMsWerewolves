@@ -33,10 +33,13 @@ class Player:
         """
         pre_instruction = f"你是{self.id}号玩家，" + self.game.instructions[self.role]
         if self.role == "werewolf":
-            wolfs = self.game.get_players("id", alive=False, role="werewolf")
+            wolfs = self.game.get_players_by_factions(t="id", faction="bad")
             wolfs.remove(self.id)
             pre_instruction += f"\n以下玩家是你的队友，他们也是狼人：{str(wolfs)}。"
-        print(pre_instruction)
+        elif self.role == "whitewolf":
+            wolfs = self.game.get_players_by_factions(t="id", faction="bad")
+            wolfs.remove(self.id)
+            pre_instruction += f"\n以下玩家是狼人，是你的暂时队友，在游戏发展中，你可以选择背叛他们以博取单人胜利：{str(wolfs)}。"
         self.messages.append({"role": "system", "content": pre_instruction})
 
     def pub_chat(self, source_id: int, content: str):

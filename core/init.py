@@ -229,9 +229,11 @@ def roles_divided(api_players_path) -> dict:
         "witch": 1,
         "guard": 1,
         "hunter": 1,
-        "joker": 0,
         "villager": -1,
     }
+    for role in LEGAL_ROLE.keys():
+        if not role in roles:
+            roles[role] = 0
     reverse_choices = {ROLE_INDEX[i]: i for i in ROLE_INDEX.keys()}
     bads = get_role_by_faction("bad")
     goods = get_role_by_faction("good")
