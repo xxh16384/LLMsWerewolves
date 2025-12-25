@@ -94,11 +94,14 @@ class Player:
         """
         sleep(1)
 
-        visible_ids = (
-            self.game.get_players("id", alive=False)
-            if if_pub
-            else [self.id, 0] + self.game.get_players("id", role=self.role)
-        )
+        if if_pub:
+            visible_ids = self.game.get_players("id", alive=False)
+        elif LEGAL_ROLE[self.role] == "bad":
+            visible_ids = [self.id, 0] + self.game.get_players_by_factions(
+                "id", faction="bad"
+            )
+        else:
+            visible_ids = [self.id, 0] + self.game.get_players("id", role=self.role)
         pub_messages = Context.get_context(self.id, self.game)
         prompt0 = prompt
         if if_pub:
