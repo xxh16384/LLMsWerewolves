@@ -105,6 +105,9 @@ class Game(BasicGame):
         def record_guard(message: str):
             Context(self, 0, message, self.get_players(t="id", role="guard"))
 
+        if self.get_day() == 0:
+            return
+
         guard = self.get_players(role="guard")
         if not guard:
             return
