@@ -61,17 +61,17 @@ class Game(BasicGame):
         此函数负责初始化某些特殊角色所需要的变量，如女巫需要记录当晚毒的人。
         """
         self.kill_tonight = []
-        if self.roles["witch"] > 0:
+        if "witch" in self.roles and self.roles["witch"] > 0:
             self.poisoned_tonight = []
-        if self.roles["guard"] > 0:
+        if "guard" in self.roles and self.roles["guard"] > 0:
             self.guard_tonight = []
             self.last_guard = 0
-        if self.roles["fool"] > 0:
+        if "fool" in self.roles and self.roles["fool"] > 0:
             self.voted_fools = []
 
     def routine(self):
         def check(role):
-            return self.roles[role] > 0
+            return role in self.roles and self.roles[role] > 0
 
         routines = (
             ((self.day_night_change, "月亮升起"), True),
@@ -115,7 +115,7 @@ class Game(BasicGame):
         )
         target = read_reply(guard)
         if target and target[0] != 0:
-            if not(self.get_day() == 1 and target[0] == guard.id):
+            if not (self.get_day() == 1 and target[0] == guard.id):
                 record_guard(f"在{self.get_day()}的晚上，你保护了{target[0]}号玩家。")
             self.guard_tonight.append(target[0])
             return
@@ -163,7 +163,10 @@ class Game(BasicGame):
         killed = find_max_key(result)
         if killed and killed != 0:
             record_werewolf(f"在{self.get_day()}的晚上，{killed}号玩家被狼人标记要杀。")
-            if not killed in self.guard_tonight:
+            try:
+                if not killed in self.guard_tonight:
+                    self.kill_tonight.append(killed)
+            except:
                 self.kill_tonight.append(killed)
         else:
             record_werewolf(f"在{self.get_day()}的晚上，狼人没有选择任何人要杀。")
@@ -359,20 +362,33 @@ class Game(BasicGame):
         Returns:
             str: 返回胜利阵营的名称 ("狼人" 或 "好人")。
         """
-        if (
-            len(self.get_players(alive=True))
-            - 2 * len(self.get_players(alive=True, role="werewolf"))
-            < 0
-        ):
-            Context(
-                self,
-                0,
-                f"游戏结束，狼人获胜",
-                self.get_players(t="id", alive=False),
-            )
-            print("【系统】游戏结束！狼人阵营获胜。")
-            return "狼人"
-        elif len(self.get_players(alive=True, role="werewolf")) == 0:
+        bad_people = len(self.get_players_by_faction(faction="bad"))
+        good_people = len(self.get_players_by_faction(faction="good"))
+        neutral_people = len(self.get_players_by_faction(faction="neutral"))
+        if bad_people >= good_people + neutral_people:
+            if (
+                "whitewolf" in self.roles
+                and self.roles["whitewolf"] > 0
+                and len(self.get_players(role="whitewolf")) != bad_people
+            ):
+                Context(
+                    self,
+                    0,
+                    f"游戏结束，白狼获胜",
+                    self.get_players(t="id", alive=False),
+                )
+                print("【系统】游戏结束！白狼独赢。")
+                return "白狼"
+            else:
+                Context(
+                    self,
+                    0,
+                    f"游戏结束，狼人获胜",
+                    self.get_players(t="id", alive=False),
+                )
+                print("【系统】游戏结束！狼人阵营获胜。")
+                return "狼人"
+        elif bad_people == 0:
             Context(
                 self,
                 0,

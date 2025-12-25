@@ -62,19 +62,30 @@ class BasicGame:
         """
         self.stage += 1
         days, morning_dusk = self.get_game_stage()
-        if self.guard_tonight:
-            self.last_guard = self.guard_tonight[0]
-            self.guard_tonight = []
-        else:
-            self.last_guard = 0
+        try:
+            if self.guard_tonight:
+                self.last_guard = self.guard_tonight[0]
+                self.guard_tonight = []
+            else:
+                self.last_guard = 0
+        except:
+            pass
         if morning_dusk == 1 and days > 1:
             if self.kill_tonight or self.poisoned_tonight:
-                self.died_tonight = list(set(self.kill_tonight + self.poisoned_tonight))
+                try:
+                    self.died_tonight = list(
+                        set(self.kill_tonight + self.poisoned_tonight)
+                    )
+                except:
+                    self.died_tonight = list(set(self.kill_tonight))
                 self.broadcast(f"昨晚{str(self.died_tonight)[1:-1]}号玩家被杀了")
                 self.out(self.kill_tonight, "killed")
-                self.out(self.poisoned_tonight, "poisoned")
                 self.kill_tonight = []
-                self.poisoned_tonight = []
+                try:
+                    self.out(self.poisoned_tonight, "poisoned")
+                    self.poisoned_tonight = []
+                except:
+                    pass
             else:
                 self.broadcast(f"昨晚是个平安夜，没有人被杀")
 
@@ -94,7 +105,7 @@ class BasicGame:
         此函数通过vote函数和police函数，统计投票结果，并投出警长。
         """
         result = find_max_key(self.vote(t="police"))
-        self.police([result])
+        self.police_get(player_ids=[result])
 
     def vote_section(self):
         """执行白天的投票阶段，并统计投票结果，并将出局者投出。
@@ -102,9 +113,9 @@ class BasicGame:
         此函数通过vote函数和out函数，统计投票结果，并投出出局者。
         """
         result = find_max_key(self.vote(t="out"))
-        self.out([result])
+        self.out(player_ids=[result])
 
-    def police(self, player_ids: list):
+    def police_get(self, player_ids: list):
         """通过投票结果，决定今天的警长。
 
         此函数通过导入的投票结果，判断是否出现警长，并且标记其为警长。
@@ -252,27 +263,46 @@ class BasicGame:
                 elif t == "id":
                     return [i.id for i in self.players if i.role == role]
 
-    def get_players_by_factions(self, t: str = "object", faction: str = "bad") -> list:
+    def get_players_by_factions(
+        self, t: str = "object", alive: bool = True, faction: str = "bad"
+    ) -> list:
         """根据玩家阵营获取对应的玩家ID或对象列表。
 
         Args:
             t (str, optional): 返回列表的元素类型。'object' 表示返回玩家对象，
                 'id' 表示返回玩家ID。默认为 'object'。
+            alive (bool, optional): 是否读取仅存活的玩家。
             faction (str, optional): 玩家的阵营。
 
         Returns:
             list: 包含与阵营匹配的Player的ID或对象的列表。
         """
         if t == "object":
-            players_pending = [
-                player for player in self.players if LEGAL_ROLE[player.role] == faction
-            ]
+            if alive:
+                players_pending = [
+                    player
+                    for player in self.players
+                    if LEGAL_ROLE[player.role] == faction and player.alive
+                ]
+            else:
+                players_pending = [
+                    player
+                    for player in self.players
+                    if LEGAL_ROLE[player.role] == faction
+                ]
         elif t == "id":
-            players_pending = [
-                player.id
-                for player in self.players
-                if LEGAL_ROLE[player.role] == faction
-            ]
+            if alive:
+                players_pending = [
+                    player.id
+                    for player in self.players
+                    if LEGAL_ROLE[player.role] == faction and player.alive
+                ]
+            else:
+                players_pending = [
+                    player.id
+                    for player in self.players
+                    if LEGAL_ROLE[player.role] == faction
+                ]
         return players_pending
 
     def get_players_by_ids(self, ids: list) -> list:
