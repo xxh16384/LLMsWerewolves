@@ -191,6 +191,8 @@ class Player:
             self.revenge = True
         elif self.role == "joker":
             self.joker = True
+        elif self.role == "fool":
+            self.fool = True
 
     def __str__(self) -> str:
         """返回玩家对象的字符串表示形式。

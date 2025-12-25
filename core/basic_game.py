@@ -93,7 +93,7 @@ class BasicGame:
 
         此函数通过vote函数和police函数，统计投票结果，并投出警长。
         """
-        result = find_max_key(self.vote(type="police"))
+        result = find_max_key(self.vote(t="police"))
         self.police([result])
 
     def vote_section(self):
@@ -101,7 +101,7 @@ class BasicGame:
 
         此函数通过vote函数和out函数，统计投票结果，并投出出局者。
         """
-        result = find_max_key(self.vote(type="out"))
+        result = find_max_key(self.vote(t="out"))
         self.out([result])
 
     def police(self, player_ids: list):
@@ -124,7 +124,7 @@ class BasicGame:
             f"在{self}的警徽阶段，{self.police}号成为了警长。他在这一天的投票阶段持有两张票。"
         )
 
-    def vote(self, type: str) -> dict:
+    def vote(self, t: str) -> dict:
         """执行白天的投票阶段，并统计投票结果。
 
         此函数向所有存活的玩家广播投票指示，收集每个玩家的投票选择。
@@ -138,12 +138,12 @@ class BasicGame:
         """
         players_pending = self.get_players()
         for player in players_pending:
-            if type == "out":
+            if t == "out":
                 player.pub_chat(
                     0,
                     "现在要将一个玩家投票出局。请投票，投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以简短发言，解释投票理由。",
                 )
-            elif type == "police":
+            elif t == "police":
                 player.pub_chat(
                     0,
                     "现在要投票决出一个警长。请投票，投票结果用[]包围，其中只包含编号数字，例如[1]。在此阶段你可以简短发言，解释投票理由。",
@@ -151,11 +151,14 @@ class BasicGame:
         result = makeDic(players_pending)
         for player in players_pending:
             voted = read_reply(player)
-            if voted and int(voted[-1]) in self.get_players("id"):
-                if type == "out" and player.id == self.police:
-                    result[int(voted[-1])] += 2
-                else:
-                    result[int(voted[-1])] += 1
+            if voted:
+                voted = int(voted[-1])
+                if voted in self.get_players("id"):
+                    if not (voted in self.voted_fool or player.id in self.voted_fool):
+                        if t == "out" and player.id == self.police:
+                            result[voted] += 2
+                        else:
+                            result[voted] += 1
         return result
 
     def no_out(self, player_ids: list):

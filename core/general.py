@@ -17,7 +17,9 @@ LEGAL_ROLE = {
     "guard": "good",
     "hunter": "good",
     "joker": "neutral",
+    "fool": "good",
     "whitewolf": "bad",
+    "hiddenwolf": "bad",
 }
 
 # 职业索引，在开局定义职业时，每个职业对应的编号
@@ -32,6 +34,7 @@ ROLE_INDEX = {
     "6": "joker",
     "7": "fool",
     "8": "whitewolf",
+    "9": "hiddenwolf",
 }
 
 # 玩家对应表，用于输出每个职业的中文名
@@ -46,6 +49,7 @@ PLAYERDIC = {
     "joker": "小丑",
     "fool": "傻子",
     "whitewolf": "白狼",
+    "hiddenwolf": "隐狼",
 }
 # 只能存在一个的职业
 SINGLE_ROLE = [

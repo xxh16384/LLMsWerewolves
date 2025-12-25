@@ -66,6 +66,8 @@ class Game(BasicGame):
         if self.roles["guard"] > 0:
             self.guard_tonight = []
             self.last_guard = 0
+        if self.roles["fool"] > 0:
+            self.voted_fools = []
 
     def routine(self):
         def check(role):
@@ -128,8 +130,9 @@ class Game(BasicGame):
             target.private_chat(0, message)
 
         def record_werewolf(message: str):
-            Context(self, 0, message, self.get_players(t="id", role="werewolf"))
-            Context(self, 0, message, self.get_players(t="id", role="whitewolf"))
+            Context(
+                self, 0, message, self.get_players_by_factions(t="id", faction="bad")
+            )
 
         # wolves = self.get_players(role="werewolf")
 
@@ -224,7 +227,7 @@ class Game(BasicGame):
                 target_identity = LEGAL_ROLE[target_player.role]
             target_identity = TRANSLATE[target_identity]
             record_seer(
-                f"在{self.get_day()}的晚上，你查的玩家是{target}号，他的身份是：{target_identity}。"
+                f"在{self.get_day()}的晚上，你查的玩家是{target}号，他的身份是：{target_identity}，{"但注意，他也有可能是隐狼" if "hiddenwolf" in LEGAL_ROLE.keys() else ""}。"
             )
         else:
             record_seer(f"在{self.get_day()}的晚上，你没有查询任何人的身份。")
@@ -297,7 +300,7 @@ class Game(BasicGame):
         Raises:
             ValueError: 如果传入的玩家ID列表无效或找不到对应玩家。
         """
-        if not player_ids:
+        if (not player_ids) and ways == "voted":
             self.broadcast(f"在{self}的投票阶段，由于出现了平票现象，所以出局失败。")
             return
         players_pending = self.get_players_by_ids(player_ids)
@@ -305,13 +308,32 @@ class Game(BasicGame):
             raise ValueError("出局失败")
         for outed_player in players_pending:
             outed_player.alive = False
-            self.broadcast(f"在{self}的投票阶段，{str(outed_player)}号玩家出局。")
+
+            # 傻子检验
+            try:
+                if outed_player.fool and ways == "voted":
+                    self.broadcast(
+                        f"在{self}的投票阶段，{str(outed_player)}号玩家得到了最多票数……但他是傻子，并没有出局，之后他无法再投票，也无法被人投票。"
+                    )
+                    self.voted_fools.append(outed_player)
+            except:
+                if ways == "voted":
+                    self.broadcast(
+                        f"在{self}的投票阶段，{str(outed_player)}号玩家出局。"
+                    )
+
+            # 小丑检验
             try:
                 if outed_player.joker and ways == "voted":
                     self.special_win(outed_player, "joker")
+            except:
+                pass
+
+            # 猎人检验
+            try:
                 if outed_player.revenge and ways != "poisoned":
-                    bcmessage = f"{outed_player.id}是猎人！他将在死前杀死一名任意玩家！"
-                    pcmessage = "你要杀死谁？要杀死的玩家编号请用[]包围，例如'我要[7]号玩家'。可以简短的给出理由。"
+                    bcmessage = f"{outed_player.id}是猎人！他被{"投票出局" if ways == "voted" else "杀死"}了！他将在死前杀死一名任意玩家！"
+                    pcmessage = "你要杀死谁？要杀死的玩家编号请用[]包围，例如'我要杀死[7]号玩家'。可以简短的给出理由，你必须要杀死一个人。"
                     self.broadcast(bcmessage)
                     outed_player.private_chat(0, pcmessage)
                     target = read_reply(outed_player)
@@ -321,6 +343,7 @@ class Game(BasicGame):
                     self.out(target, "killed")
             except:
                 pass
+
             if self.gg:
                 break
 
