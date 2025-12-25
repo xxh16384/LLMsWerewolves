@@ -1,6 +1,13 @@
 # 时间对应表，不建议改变
 TIMEDIC = {1: "白天", 0: "晚上"}
 
+# 翻译表，不建议改变
+TRANSLATE = {
+    "good": "非狼人",
+    "neutral": "非狼人",
+    "bad": "狼人",
+}
+
 # 当前程序中，可以选择的职业以及对应的阵营
 LEGAL_ROLE = {
     "villager": "good",

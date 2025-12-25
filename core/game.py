@@ -8,6 +8,7 @@ from .tools import (
 from .context import Context
 from .player import Player
 from .basic_game import BasicGame
+from .general import *
 
 
 class Game(BasicGame):
@@ -216,8 +217,14 @@ class Game(BasicGame):
         )
         target = read_reply(seer)
         if target and target != 0:
+            target_player = self.get_players_by_ids(target)[0]
+            if target_player.role == "hiddenwolf":
+                target_identity = "good"
+            else:
+                target_identity = LEGAL_ROLE[target_player.role]
+            target_identity = TRANSLATE[target_identity]
             record_seer(
-                f"在{self.get_day()}的晚上，你查的玩家是{target}号，他的身份是{self.get_players_by_ids(target)[0].role}。"
+                f"在{self.get_day()}的晚上，你查的玩家是{target}号，他的身份是：{target_identity}。"
             )
         else:
             record_seer(f"在{self.get_day()}的晚上，你没有查询任何人的身份。")
