@@ -123,12 +123,19 @@ class Player:
 
         # print(f"{self} 的上下文： {message_and_time}")
 
-        response = self.client.chat.completions.create(
-            model=self.game.apis[self.using_preset]["model_name"],
-            messages=message_and_time,
-            stream=True,
-        )
-        self.messages[-1]["content"] = prompt0
+        times = 0
+        while times < 3:
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.game.apis[self.using_preset]["model_name"],
+                    messages=message_and_time,
+                    stream=True,
+                )
+                self.messages[-1]["content"] = prompt0
+                break
+            except:
+                times += 1
+                sleep(5)
 
         collected_messages = ""
         reasoning_messages = ""
