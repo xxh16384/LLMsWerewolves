@@ -154,7 +154,15 @@ class BasicGame:
             if voted:
                 voted = int(voted[-1])
                 if voted in self.get_players("id"):
-                    if not (voted in self.voted_fool or player.id in self.voted_fool):
+                    try:
+                        if not (
+                            voted in self.voted_fools or player.id in self.voted_fools
+                        ):
+                            if t == "out" and player.id == self.police:
+                                result[voted] += 2
+                            else:
+                                result[voted] += 1
+                    except:
                         if t == "out" and player.id == self.police:
                             result[voted] += 2
                         else:
