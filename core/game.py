@@ -105,21 +105,21 @@ class Game(BasicGame):
         def record_guard(message: str):
             Context(self, 0, message, self.get_players(t="id", role="guard"))
 
-        if self.get_day() == 1:
-            return
-
         guard = self.get_players(role="guard")
         if not guard:
             return
         guard = guard[0]
 
         talk_guard(
-            f"你今晚要保护谁？要保护的玩家编号请用[]包围，若不保护人则输出[0]。注意，你不可连续两晚保护同一个人{"" if self.last_guard == 0 else "，你昨晚保护了["+str(self.last_guard)+"]号玩家，因此你今晚无法保护这个玩家"}。例如'我要保护[7]号玩家'或'我不想保护人，[0]'。可以简短的给出理由。"
+            f"你今晚要保护谁？要保护的玩家编号请用[]包围，若不保护人则输出[0]。注意，你不可连续两晚保护同一个人{"，且今晚是第一晚，你不能守卫自己" if self.get_day() == 1 else ""}{"" if self.last_guard == 0 else "，你昨晚保护了["+str(self.last_guard)+"]号玩家，因此你今晚无法保护这个玩家"}。例如'我要保护[7]号玩家'或'我不想保护人，[0]'。可以简短的给出理由。"
         )
         target = read_reply(guard)
         if target and target[0] != 0:
-            record_guard(f"在{self.get_day()}的晚上，你保护了{target}号玩家。")
-        self.guard_tonight.append(target[0])
+            if not(self.get_day() == 1 and target[0] == guard.id):
+                record_guard(f"在{self.get_day()}的晚上，你保护了{target[0]}号玩家。")
+            self.guard_tonight.append(target[0])
+            return
+        record_guard(f"在{self.get_day()}的晚上，你没有保护任何人。")
 
     def werewolf_killing(self):
         """处理狼人团队的夜晚杀人行动。
