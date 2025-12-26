@@ -78,9 +78,13 @@ class BasicGame:
                     )
                 except:
                     self.died_tonight = list(set(self.kill_tonight))
-                self.broadcast(
-                    f"在{self}的前一晚，{str(self.died_tonight)[1:-1]}号玩家被杀了"
-                )
+                self.broadcast(f"在{self}的前一晚，{self.died_tonight}号玩家被杀了")
+                for died_player in self.died_tonight:
+                    if died_player.role == "poet":
+                        self.broadcast(
+                            f"{died_player.id}号玩家是吟游诗人！在他死之后，现在所有的好人都知道了这条消息。注意，狼人或者中立职业不会得知这条消息。",
+                            faction="good",
+                        )
                 self.out(self.kill_tonight, "killed")
                 self.kill_tonight = []
                 try:
@@ -320,15 +324,25 @@ class BasicGame:
         players_pending = [i for i in self.players if i.id in ids]
         return players_pending
 
-    def broadcast(self, content: str):
+    def broadcast(self, content: str, alive: bool = True, faction: str = "all"):
         """向游戏中的所有玩家广播一条消息。
 
-        该消息将被添加到每个玩家（无论存活与否）的上下文中。
+        该消息将被添加到每个玩家的上下文中。
 
         Args:
             content (str): 要广播的消息内容。
+            alive (bool, optional): 广播对象是否必须活着
+            faction (str, optional): 要广播的对象。
         """
-        Context(self, 0, content, self.get_players(t="id", alive=False))
+        if faction == "all":
+            Context(self, 0, content, self.get_players(t="id", alive=alive))
+        else:
+            Context(
+                self,
+                0,
+                content,
+                self.get_players_by_factions(t="id", alive=alive, faction=faction),
+            )
 
     def give_role(self) -> str:
         """从剩余的角色池中随机分配一个角色。

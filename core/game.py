@@ -313,40 +313,36 @@ class Game(BasicGame):
         if not players_pending:
             raise ValueError("出局失败")
         for outed_player in players_pending:
-            outed_player.alive = False
+
+            # 吟游诗人检验
+            if outed_player.role == "poet":
+                self.broadcast(
+                    f"{outed_player.id}号玩家是吟游诗人！在他死之后，现在所有的好人都知道了这条消息。注意，狼人或者中立职业不会得知这条消息。",
+                    faction="good",
+                )
 
             # 傻子检验
-            try:
-                if outed_player.fool and ways == "voted":
-                    self.broadcast(
-                        f"在{self}的投票阶段，{outed_player.id}号玩家得到了最多票数……但他是傻子，并没有出局，之后他无法再投票，也无法被人投票。"
-                    )
-                    self.voted_fools.append(outed_player.id)
-            except:
-                if ways == "voted":
-                    self.broadcast(f"在{self}的投票阶段，{outed_player.id}号玩家出局。")
+            if outed_player.role == "fool" and ways == "voted":
+                self.broadcast(
+                    f"在{self}的投票阶段，{outed_player.id}号玩家得到了最多票数……但他是傻子，并没有出局，之后他无法再投票，也无法被人投票。"
+                )
+                self.voted_fools.append(outed_player.id)
+            elif outed_player.role == "joker" and ways == "voted":
+                self.special_win(outed_player, "joker")
+            elif ways == "voted":
+                self.broadcast(f"在{self}的投票阶段，{outed_player.id}号玩家出局。")
+                outed_player.alive = False
 
-            # 小丑检验
-            try:
-                if outed_player.joker and ways == "voted":
-                    self.special_win(outed_player, "joker")
-            except:
-                pass
-
-            # 猎人检验
-            try:
-                if outed_player.revenge and ways != "poisoned":
-                    bcmessage = f"{outed_player.id}号玩家是猎人！他被{"投票出局" if ways == "voted" else "杀死"}了！他将在死前杀死一名任意玩家！"
-                    pcmessage = "你要杀死谁？要杀死的玩家编号请用[]包围，例如'我要杀死[7]号玩家'。可以简短的给出理由，你必须要杀死一个人。"
-                    self.broadcast(bcmessage)
-                    outed_player.private_chat(0, pcmessage)
-                    target = read_reply(outed_player)
-                    self.broadcast(
-                        f"{outed_player.id}号玩家作为猎人，在死后杀死了{target}号玩家！"
-                    )
-                    self.out(target, "killed")
-            except:
-                pass
+            if outed_player.role == "hunter" and ways != "poisoned":
+                bcmessage = f"{outed_player.id}号玩家是猎人！他被{"投票出局" if ways == "voted" else "杀死"}了！他将在死前杀死一名任意玩家！"
+                pcmessage = "你要杀死谁？要杀死的玩家编号请用[]包围，例如'我要杀死[7]号玩家'。可以简短的给出理由，你必须要杀死一个人。"
+                self.broadcast(bcmessage)
+                outed_player.private_chat(0, pcmessage)
+                target = read_reply(outed_player)
+                self.broadcast(
+                    f"{outed_player.id}号玩家作为猎人，在死后杀死了{target}号玩家！"
+                )
+                self.out(target, "killed")
 
             if self.gg:
                 break
