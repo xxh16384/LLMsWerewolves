@@ -78,7 +78,9 @@ class BasicGame:
                     )
                 except:
                     self.died_tonight = list(set(self.kill_tonight))
-                self.broadcast(f"昨晚{str(self.died_tonight)[1:-1]}号玩家被杀了")
+                self.broadcast(
+                    f"在{self}的前一晚，{str(self.died_tonight)[1:-1]}号玩家被杀了"
+                )
                 self.out(self.kill_tonight, "killed")
                 self.kill_tonight = []
                 try:
@@ -87,7 +89,7 @@ class BasicGame:
                 except:
                     pass
             else:
-                self.broadcast(f"昨晚是个平安夜，没有人被杀")
+                self.broadcast(f"{self}的前一晚是个平安夜，没有人被杀")
 
     def public_discussion(self):
         """执行白天的公共讨论阶段。

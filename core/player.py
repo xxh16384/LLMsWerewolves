@@ -60,7 +60,7 @@ class Player:
         else:
             self.get_response(f"{source_id}号玩家：{content}", True)
 
-    def private_chat(self, source_id: int, content: str):
+    def private_chat(self, source_id: int, content: str, faction: bool = False):
         """处理并响应一则私人聊天消息。
 
         此方法用于玩家接收并回应一则私密消息（通常来自系统）。
@@ -69,17 +69,27 @@ class Player:
         Args:
             source_id (int): 消息来源的ID。通常为0，代表系统（上帝）。
             content (str): 消息的具体内容。
+            faction (bool, optional): 一个布尔值，指示是否给所有同阵营的发布信息。
+                True表示发布，False表示不发布。
         """
         if source_id == 0:
             Context(self.game, 0, f"{content}", [self.id])
-            self.get_response(f"上帝：{content}", False)
+            self.get_response(f"上帝：{content}", False, if_faction=faction)
         else:
             Context(self.game, source_id, f"{content}", [self.id])
             if not self.game.webui_mode:
                 print(f"{source_id}号玩家：{content}")
-            self.get_response(f"{source_id}号玩家：{content}", False)
+            self.get_response(
+                f"{source_id}号玩家：{content}", False, if_faction=faction
+            )
 
-    def get_response(self, prompt: str, if_pub: bool):
+    def get_response(
+        self,
+        prompt: str,
+        if_pub: bool = False,
+        if_faction: bool = False,
+        if_self: bool = True,
+    ):
         """根据提示生成并处理玩家的响应。
 
         此函数是玩家与AI模型交互的核心。它会整合历史消息和当前提示，
@@ -89,19 +99,30 @@ class Player:
 
         Args:
             prompt (str): 对玩家的当前提示或问题。
-            if_pub (bool): 一个布尔值，指示当前是否为公共发言阶段。
+            if_pub (bool, optional): 一个布尔值，指示当前是否为公共发言阶段。
                 True表示公共，False表示私聊。
+            if_faction (bool, optional): 一个布尔值，指示是否给所有同阵营的发布信息。
+                True表示发布，False表示不发布。
+            if_self (bool, optional): 一个布尔值，指示是否给所有同阵营的发布信息。
+                True表示发布，False表示不发布。
         """
         sleep(1)
 
         if if_pub:
+            # 全体
             visible_ids = self.game.get_players("id", alive=False)
-        elif LEGAL_ROLE[self.role] == "bad":
+        elif if_faction:
+            # 同阵营
             visible_ids = [self.id, 0] + self.game.get_players_by_factions(
-                "id", faction="bad"
+                "id", faction=LEGAL_ROLE[self.role]
             )
-        else:
+        elif if_self:
+            # 同职责
             visible_ids = [self.id, 0] + self.game.get_players("id", role=self.role)
+        else:
+            # 仅自己
+            visible_ids = [self.id, 0]
+
         pub_messages = Context.get_context(self.id, self.game)
         prompt0 = prompt
         if if_pub:

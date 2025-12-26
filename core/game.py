@@ -130,7 +130,7 @@ class Game(BasicGame):
         """
 
         def talk_werewolf(target: Player, message: str):
-            target.private_chat(0, message)
+            target.private_chat(0, message, faction=True)
 
         def record_werewolf(message: str):
             Context(
@@ -180,7 +180,7 @@ class Game(BasicGame):
         """
 
         def talk_whitewolf(message: str):
-            whitewolf.private_chat(0, message)
+            whitewolf.private_chat(0, message, faction=False)
 
         def record_whitewolf(message: str):
             Context(self, 0, message, self.get_players(t="id", role="whitewolf"))
@@ -319,14 +319,12 @@ class Game(BasicGame):
             try:
                 if outed_player.fool and ways == "voted":
                     self.broadcast(
-                        f"在{self}的投票阶段，{str(outed_player)}号玩家得到了最多票数……但他是傻子，并没有出局，之后他无法再投票，也无法被人投票。"
+                        f"在{self}的投票阶段，{outed_player.id}号玩家得到了最多票数……但他是傻子，并没有出局，之后他无法再投票，也无法被人投票。"
                     )
-                    self.voted_fools.append(outed_player)
+                    self.voted_fools.append(outed_player.id)
             except:
                 if ways == "voted":
-                    self.broadcast(
-                        f"在{self}的投票阶段，{str(outed_player)}号玩家出局。"
-                    )
+                    self.broadcast(f"在{self}的投票阶段，{outed_player.id}号玩家出局。")
 
             # 小丑检验
             try:
@@ -338,7 +336,7 @@ class Game(BasicGame):
             # 猎人检验
             try:
                 if outed_player.revenge and ways != "poisoned":
-                    bcmessage = f"{outed_player.id}是猎人！他被{"投票出局" if ways == "voted" else "杀死"}了！他将在死前杀死一名任意玩家！"
+                    bcmessage = f"{outed_player.id}号玩家是猎人！他被{"投票出局" if ways == "voted" else "杀死"}了！他将在死前杀死一名任意玩家！"
                     pcmessage = "你要杀死谁？要杀死的玩家编号请用[]包围，例如'我要杀死[7]号玩家'。可以简短的给出理由，你必须要杀死一个人。"
                     self.broadcast(bcmessage)
                     outed_player.private_chat(0, pcmessage)
