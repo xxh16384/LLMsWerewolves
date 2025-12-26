@@ -21,6 +21,7 @@ LEGAL_ROLE = {
     "whitewolf": "bad",
     "hiddenwolf": "bad",
     "poet": "good",
+    "bear": "good",
 }
 
 # 职业索引，在开局定义职业时，每个职业对应的编号
@@ -37,6 +38,7 @@ ROLE_INDEX = {
     "8": "whitewolf",
     "9": "hiddenwolf",
     "a": "poet",
+    "b": "bear",
 }
 
 # 玩家对应表，用于输出每个职业的中文名
@@ -53,6 +55,7 @@ PLAYERDIC = {
     "whitewolf": "白狼",
     "hiddenwolf": "隐狼",
     "poet": "吟游诗人",
+    "bear": "熊",
 }
 # 只能存在一个的职业
 SINGLE_ROLE = [
@@ -62,6 +65,7 @@ SINGLE_ROLE = [
     "joker",
     "whitewolf",
     "poet",
+    "bear",
 ]
 
 # 简单的职业，不需要通用提示词

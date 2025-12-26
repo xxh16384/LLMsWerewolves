@@ -78,13 +78,17 @@ class BasicGame:
                     )
                 except:
                     self.died_tonight = list(set(self.kill_tonight))
+
                 self.broadcast(f"在{self}的前一晚，{self.died_tonight}号玩家被杀了")
-                for died_player in self.died_tonight:
+
+                for died_player_id in self.died_tonight:
+                    died_player = self.get_players_by_ids([died_player_id])[0]
                     if died_player.role == "poet":
                         self.broadcast(
                             f"{died_player.id}号玩家是吟游诗人！在他死之后，现在所有的好人都知道了这条消息。注意，狼人或者中立职业不会得知这条消息。",
                             faction="good",
                         )
+
                 self.out(self.kill_tonight, "killed")
                 self.kill_tonight = []
                 try:
@@ -134,7 +138,8 @@ class BasicGame:
             return
         players_pending = self.get_players_by_ids(player_ids)
         if not players_pending:
-            raise ValueError("警徽投票失败")
+            self.broadcast(f"在{self}的警徽阶段，出现了平票现象，没有任何人成为警长。")
+            return
         policeman = players_pending[0].id
         self.police = policeman
         self.broadcast(

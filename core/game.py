@@ -81,6 +81,7 @@ class Game(BasicGame):
             ((self.seer_seeing, "预言家醒来"), check("seer")),
             ((self.witch_operation, "女巫醒来"), check("witch")),
             ((self.day_night_change, "太阳升起"), True),
+            ((self.bear_roaring, "熊熊哈气"), check("bear")),
             ((self.public_discussion, "公共讨论"), True),
             ((self.vote_police_section, "警长投票"), True),
             ((self.vote_section, "陶片逐人"), True),
@@ -294,6 +295,49 @@ class Game(BasicGame):
         else:
             record_witch(f"在{self.get_day()}的晚上，你今晚没有毒，所以没有毒杀人。")
 
+    def bear_roaring(self):
+        """处理熊的白天操作，即判定熊是否咆哮。
+
+        此函数会检查熊的左右两侧存活玩家，并检测其中是否有狼人。
+        """
+
+        def tail_count(num):
+            return 8 + num if num < 0 else num
+
+        bear = self.get_players(role="bear", alive=False)
+
+        if not bear:
+            return
+
+        bear = bear[0]
+
+        if not bear.alive:
+            self.broadcast(f"在{self}的白天，熊没有咆哮。")
+            return
+
+        bear_place = bear.id
+        left_id = bear_place - 1
+        right_id = bear_place + 1
+        left_id = tail_count(left_id)
+        right_id = tail_count(right_id)
+
+        while not self.get_players_by_ids([left_id])[0].alive:
+            left_id -= 1
+            left_id = tail_count(left_id)
+        while not self.get_players_by_ids([right_id])[0].alive:
+            right_id -= 1
+            right_id = tail_count(right_id)
+
+        left_bad = LEGAL_ROLE[self.get_players_by_ids([left_id])[0].role] == "bad"
+        right_bad = LEGAL_ROLE[self.get_players_by_ids([right_id])[0].role] == "bad"
+
+        if_bad = left_bad or right_bad
+
+        if if_bad:
+            self.broadcast(f"在{self}的白天，熊咆哮了！")
+        else:
+            self.broadcast(f"在{self}的白天，熊没有咆哮。")
+
     def out(self, player_ids: list, ways: str = "voted"):
         """将一个或多个玩家标记为出局。
 
@@ -307,17 +351,18 @@ class Game(BasicGame):
             ValueError: 如果传入的玩家ID列表无效或找不到对应玩家。
         """
         if (not player_ids) and ways == "voted":
-            self.broadcast(f"在{self}的投票阶段，由于出现了平票现象，所以出局失败。")
+            self.broadcast(f"在{self}的投票阶段，由于出现了平票现象，所以没有人出局。")
             return
         players_pending = self.get_players_by_ids(player_ids)
         if not players_pending:
-            raise ValueError("出局失败")
+            self.broadcast(f"在{self}的投票阶段，出现了平票现象，所以没有人出局。")
+            return
         for outed_player in players_pending:
 
             # 吟游诗人检验
             if outed_player.role == "poet":
                 self.broadcast(
-                    f"{outed_player.id}号玩家是吟游诗人！在他死之后，现在所有的好人都知道了这条消息。注意，狼人或者中立职业不会得知这条消息。",
+                    f"{outed_player.id}号玩家是吟游诗人！在他死之后，现在所有的好人都知道了这条消息。注意，狼人或者中立职业不会得知这条消息。好人们可以通过第一个报出这条信息以证明自己是好人，或隐瞒这条信息观察谁不知道这条信息以知道谁是坏人。",
                     faction="good",
                 )
 
@@ -331,6 +376,8 @@ class Game(BasicGame):
                 self.special_win(outed_player, "joker")
             elif ways == "voted":
                 self.broadcast(f"在{self}的投票阶段，{outed_player.id}号玩家出局。")
+                outed_player.alive = False
+            else:
                 outed_player.alive = False
 
             if outed_player.role == "hunter" and ways != "poisoned":

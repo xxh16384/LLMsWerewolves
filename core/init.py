@@ -213,10 +213,12 @@ def roles_divided(api_players_path) -> dict:
 
     def roles_divided_string(role):
         if role == "villager":
-            return f"[----] 平民 数量 : {roles["villager"]:2d}"
+            return f"[----]   平民   数量: {roles["villager"]:2d}"
         add_role_id = reverse_choices[role]
         remove_role_id = "1" + add_role_id
-        return f"[{add_role_id}/{remove_role_id}]{PLAYERDIC[role]:^5}数量：{roles[role]:2d}"
+        role_length = len(PLAYERDIC[role])
+        space_times = (10 - role_length * 2) // 2
+        return f"[{add_role_id}/{remove_role_id}]{" "*space_times}{PLAYERDIC[role]}{" "*space_times}数量：{roles[role]:2d}"
 
     def count(therole):
         return sum([roles[role] for role in therole])

@@ -218,12 +218,6 @@ class Player:
         if self.role == "witch":
             self.poison = True
             self.antidote = True
-        elif self.role == "hunter":
-            self.revenge = True
-        elif self.role == "joker":
-            self.joker = True
-        elif self.role == "fool":
-            self.fool = True
 
     def __str__(self) -> str:
         """返回玩家对象的字符串表示形式。
