@@ -38,6 +38,10 @@ class BasicGame:
             player.init_system_prompt()
         Context(self, 0, self.role_prompts, self.get_players(t="id", alive=False))
 
+        for routine in self.init_routines:
+            if routine[1]:
+                routine[0][0]()
+
     def init_role_prompts(self):
         """初始化要发送给所有玩家的角色提示词。
 

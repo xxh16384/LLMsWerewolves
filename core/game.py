@@ -97,9 +97,7 @@ class Game(BasicGame):
             if routine[1]:
                 self.routines.append(routine[0])
 
-        for routine in init_routines:
-            if routine[1]:
-                routine[0][0]()
+        self.init_routine = init_routines
 
     def parasite_parasitic(self):
         """处理寄生虫的初始化。
