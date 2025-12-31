@@ -76,7 +76,7 @@ class Game(BasicGame):
         def check(role):
             return role in self.roles and self.roles[role] > 0
 
-        init_routines = (((self.day_night_change, "寄生虫寄生"), check("parasite")),)
+        init_routines = (((self.parasite_parasitic, "寄生虫寄生"), check("parasite")),)
 
         routines = (
             ((self.day_night_change, "月亮升起"), True),
@@ -99,7 +99,7 @@ class Game(BasicGame):
 
         for routine in init_routines:
             if routine[1]:
-                routine[0]()
+                routine[0][0]()
 
     def parasite_parasitic(self):
         """处理寄生虫的初始化。
