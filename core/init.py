@@ -261,10 +261,10 @@ def roles_divided(api_players_path) -> dict:
         choice = input("请输入：")
 
         if choice == "0":
-            if good_guy > bad_guy + neutral_guy:
+            if good_guy >= bad_guy + neutral_guy:
                 break
             else:
-                print("好人数量太少了！至少要比坏人加中立职业的数量多一个！")
+                print("好人数量太少了！至少要和坏人加中立职业的数量一样！")
         else:
             make_role(choice)
 
