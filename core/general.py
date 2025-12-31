@@ -22,6 +22,8 @@ LEGAL_ROLE = {
     "hiddenwolf": "bad",
     "poet": "good",
     "bear": "good",
+    "wanderer": "neutral",
+    "parasite": "neutral",
 }
 
 # 职业索引，在开局定义职业时，每个职业对应的编号
@@ -39,6 +41,8 @@ ROLE_INDEX = {
     "9": "hiddenwolf",
     "a": "poet",
     "b": "bear",
+    "c": "wanderer",
+    "d": "parasite",
 }
 
 # 玩家对应表，用于输出每个职业的中文名
@@ -56,7 +60,10 @@ PLAYERDIC = {
     "hiddenwolf": "隐狼",
     "poet": "吟游诗人",
     "bear": "熊",
+    "wanderer": "流浪者",
+    "parasite": "寄生虫",
 }
+
 # 只能存在一个的职业
 SINGLE_ROLE = [
     "seer",
@@ -66,6 +73,8 @@ SINGLE_ROLE = [
     "whitewolf",
     "poet",
     "bear",
+    "wanderer",
+    "parasite",
 ]
 
 # 简单的职业，不需要通用提示词

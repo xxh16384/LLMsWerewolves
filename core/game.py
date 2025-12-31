@@ -9,6 +9,7 @@ from .context import Context
 from .player import Player
 from .basic_game import BasicGame
 from .general import *
+from random import randint
 
 
 class Game(BasicGame):
@@ -68,10 +69,14 @@ class Game(BasicGame):
             self.last_guard = 0
         if "fool" in self.roles and self.roles["fool"] > 0:
             self.voted_fools = []
+        if "parasite" in self.roles and self.roles["parasite"] > 0:
+            self.parasite_target = -1
 
     def routine(self):
         def check(role):
             return role in self.roles and self.roles[role] > 0
+
+        init_routines = (((self.day_night_change, "寄生虫寄生"), check("parasite")),)
 
         routines = (
             ((self.day_night_change, "月亮升起"), True),
@@ -91,6 +96,36 @@ class Game(BasicGame):
         for routine in routines:
             if routine[1]:
                 self.routines.append(routine[0])
+
+        for routine in init_routines:
+            if routine[1]:
+                routine[0]()
+
+    def parasite_parasitic(self):
+        """处理寄生虫的初始化。
+
+        当游戏开始时，这个函数会被调用，并随机指定一个非寄生虫的对象，让其成为寄生虫的寄生目标。
+        """
+
+        def record_parasite(message: str):
+            Context(self, 0, message, self.get_players(t="id", role="parasite"))
+
+        parasite = self.get_players(role="parasite")
+        if not parasite:
+            return
+        parasite = parasite[0]
+
+        counts = sum([num for num in self.roles.values()])
+
+        parasite_target = parasite.id
+        while parasite_target != parasite.id:
+            parasite_target = randint(0, counts - 1)
+
+        self.parasite_target = parasite_target
+
+        record_parasite(
+            f"【重要】你的寄生对象是{parasite_target}号！你要保护好他，但也不能让他发现你的身份。"
+        )
 
     def guard_guarding(self):
         """处理守卫的夜晚守护行动。
@@ -341,58 +376,93 @@ class Game(BasicGame):
     def out(self, player_ids: list, ways: str = "voted"):
         """将一个或多个玩家标记为出局。
 
-        此函数将指定ID列表中的玩家的存活状态设置为False，
-        并向所有玩家广播出局信息。
+        此函数判断ID列表中的玩家是否应该存活，并调用died函数处决他们，
+        并向所有玩家广播信息。
 
         Args:
             player_ids (list): 需要出局的玩家ID列表。
-
-        Raises:
-            ValueError: 如果传入的玩家ID列表无效或找不到对应玩家。
+            ways (str, optional): 出局方式，默认为"voted"。
         """
+        # 投票阶段，没人死
         if (not player_ids) and ways == "voted":
             self.broadcast(f"在{self}的投票阶段，由于出现了平票现象，所以没有人出局。")
             return
         players_pending = self.get_players_by_ids(player_ids)
+        # 不是投票阶段，但没人死
         if not players_pending:
-            self.broadcast(f"在{self}的投票阶段，出现了平票现象，所以没有人出局。")
             return
+
         for outed_player in players_pending:
 
-            # 吟游诗人检验
-            if outed_player.role == "poet":
-                self.broadcast(
-                    f"{outed_player.id}号玩家是吟游诗人！在他死之后，现在所有的好人都知道了这条消息。注意，狼人或者中立职业不会得知这条消息。好人们可以通过第一个报出这条信息以证明自己是好人，或隐瞒这条信息观察谁不知道这条信息以知道谁是坏人。",
-                    faction="good",
-                )
-
-            # 傻子检验
+            # 傻子活着
             if outed_player.role == "fool" and ways == "voted":
                 self.broadcast(
                     f"在{self}的投票阶段，{outed_player.id}号玩家得到了最多票数……但他是傻子，并没有出局，之后他无法再投票，也无法被人投票。"
                 )
                 self.voted_fools.append(outed_player.id)
+
+            # 小丑胜利
             elif outed_player.role == "joker" and ways == "voted":
                 self.special_win(outed_player, "joker")
+
+            # 投票处决
             elif ways == "voted":
                 self.broadcast(f"在{self}的投票阶段，{outed_player.id}号玩家出局。")
-                outed_player.alive = False
-            else:
-                outed_player.alive = False
+                try:
+                    if self.parasite_target == outed_player.id:
+                        parasite = self.get_players(alive=True, role="parasite")[0]
+                        if parasite.alive:
+                            self.broadcast(
+                                f"但是{outed_player.id}被寄生了！寄生虫{parasite.id}帮他挡下了死亡！"
+                            )
+                            self.died(parasite, ways)
+                        else:
+                            print(1 / 0)
+                    else:
+                        print(1 / 0)
+                except:
+                    self.died(outed_player, ways)
 
-            if outed_player.role == "hunter" and ways != "poisoned":
-                bcmessage = f"{outed_player.id}号玩家是猎人！他被{"投票出局" if ways == "voted" else "杀死"}了！他将在死前杀死一名任意玩家！"
-                pcmessage = "你要杀死谁？要杀死的玩家编号请用[]包围，例如'我要杀死[7]号玩家'。可以简短的给出理由，你必须要杀死一个人。"
-                self.broadcast(bcmessage)
-                outed_player.private_chat(0, pcmessage)
-                target = read_reply(outed_player)
-                self.broadcast(
-                    f"{outed_player.id}号玩家作为猎人，在死后杀死了{target}号玩家！"
-                )
-                self.out(target, "killed")
+            # 其它处决
+            else:
+                self.died(outed_player, ways)
 
             if self.gg:
                 break
+
+    def died(self, outed_player: Player, ways: str = "voted"):
+        """杀死某个玩家。
+
+        此函数将指定ID列表中的玩家的存活状态设置为False，
+        并向所有玩家广播信息。
+
+        Args:
+            outed_player (Player): 需要出局的玩家对象。
+            ways (str, optional): 出局方式，默认为"voted"。
+        """
+        outed_player.alive = False
+
+        # 吟游诗人检验
+        if outed_player.role == "poet":
+            self.broadcast(
+                f"{outed_player.id}号玩家是吟游诗人！在他死之后，现在所有的好人都知道了这条消息。注意，狼人或者中立职业不会得知这条消息。好人们可以通过第一个报出这条信息以证明自己是好人，或隐瞒这条信息观察谁不知道这条信息以知道谁是坏人。",
+                faction="good",
+            )
+
+        # 猎人检验
+        if outed_player.role == "hunter" and ways != "poisoned":
+            self.broadcast(
+                f"{outed_player.id}号玩家是猎人！他被{"投票出局" if ways == "voted" else "杀死"}了！他将在死前杀死一名任意玩家！"
+            )
+            outed_player.private_chat(
+                0,
+                "你要杀死谁？要杀死的玩家编号请用[]包围，例如'我要杀死[7]号玩家'。可以简短的给出理由，你必须要杀死一个人。",
+            )
+            target = read_reply(outed_player)
+            self.broadcast(
+                f"{outed_player.id}号玩家作为猎人，在死后杀死了{target}号玩家！"
+            )
+            self.out(target, "killed")
 
     def get_winner(self) -> str | None:
         """在游戏结束后，判断并宣布胜利方。
