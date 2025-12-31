@@ -33,13 +33,20 @@ class BasicGame:
                     base_url=self.apis[preset]["base_url"],
                 )
                 self.clients[preset] = client
+
             Player(role, int(i), preset, self)
+
         for player in self.players:
             player.init_system_prompt()
+
         Context(self, 0, self.role_prompts, self.get_players(t="id", alive=False))
 
         for routine in self.init_routines:
             if routine[1]:
+                line_num = 100 - len(routine[0][1]) * 2
+                left_line_num = line_num // 2
+                right_line_num = line_num - left_line_num
+                print(f"{"—"*left_line_num} {routine[0][1]} {"—"*right_line_num}")
                 routine[0][0]()
 
     def init_role_prompts(self):
