@@ -361,8 +361,10 @@ class Game(BasicGame):
             right_id -= 1
             right_id = tail_count(right_id)
 
-        left_bad = LEGAL_ROLE[self.get_players_by_ids([left_id])[0].role] == "bad"
-        right_bad = LEGAL_ROLE[self.get_players_by_ids([right_id])[0].role] == "bad"
+        left_role = self.get_players_by_ids([left_id])[0].role
+        right_role = self.get_players_by_ids([right_id])[0].role
+        left_bad = left_role == "hiddenwolf" or LEGAL_ROLE[left_role] == "bad"
+        right_bad = right_role == "hiddenwolf" or LEGAL_ROLE[right_role] == "bad"
 
         if_bad = left_bad or right_bad
 
