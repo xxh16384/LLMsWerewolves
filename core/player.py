@@ -110,107 +110,113 @@ class Player:
             if_self (bool, optional): 一个布尔值，指示是否给所有同阵营的发布信息。
                 True表示发布，False表示不发布。
         """
+
+        def get_visibles():
+            # 获取“这个信息的可见对象”的列表
+            if if_pub:
+                visible_ids = self.game.get_players("id", alive=False)
+            elif if_faction:
+                visible_ids = [self.id, 0] + self.game.get_players_by_factions(
+                    "id", faction=LEGAL_ROLE[self.role]
+                )
+            elif if_self:
+                visible_ids = [self.id, 0] + self.game.get_players("id", role=self.role)
+            else:
+                visible_ids = [self.id, 0]
+            return visible_ids
+
+        def get_prompts():
+            # 获取将要发送给AI的信息
+
+            # 获取所有对该player公开的消息
+            pub_messages = Context.get_context(self.id, self.game)
+            # 将这段对话单独存入AI的上下文中
+            self.messages.append({"role": "user", "content": prompt})
+            # 单独拉一个上下文出来
+            message_and_time = self.messages.copy()
+
+            if if_pub:
+                system_prompt = f"\n此前你能得知的玩家发言以及公共信息如下：{str(pub_messages)}。注意：你现在在公共发言阶段，你的**所有输出**都会被**所有玩家**听到，此阶段不允许私聊。如果你有想要隐瞒的信息，请不要暴露你的意图，同理，也不要太信任他人在公共频道说的话。你不允许使用任何括号括住你的任何发言。"
+            else:
+                system_prompt = f"\n此前你能得知的玩家发言以及公共信息如下：{str(pub_messages)}。注意：你现在在私聊阶段，你的输出只会被上帝听到。如果你是狼人，你的聊天还会被同阵营的玩家听到。"
+
+            # 然后在这个单独的上下文中再添加这些想要添加的，只需要给这一段的信息（之前的那个诗山太tm抽象了）
+            message_and_time.append(
+                {"role": "system", "content": f"现在是{self.game}。{system_prompt}"}
+            )
+            # cur_io.IO_output(f"{self} 的上下文： {message_and_time}")
+
+            return message_and_time
+
+        def get_model_response(max_times: int = 3):
+            times = 0
+            response = ""
+            while times < max_times:
+                try:
+                    response = self.client.chat.completions.create(
+                        model=self.game.apis[self.using_preset]["model_name"],
+                        messages=message_and_time,
+                        stream=True,
+                    )
+                    break
+                except Exception as e:
+                    times += 1
+                    sleep(5)
+                    if times == max_times:
+                        cur_io.IO_output(
+                            f"————————————————————————————————————————报告！报错了！{max_times}次请求都没有请求到API返回！但我没有做处理！所以你最好这里直接把程序关了不然一会还是会报错！————————————————————————————————————————"
+                        )
+                        cur_io.IO_input(f"报错信息:{type(e).__name__, str(e)}")
+            return response
+
+        def get_final_content(response):
+            collected_content = []
+            collected_reasoning = []
+            is_thinking = False  # 标记一下是否在思考
+            cur_io.IO_s_output(f"玩家{self.id}（{self.role}）： ")
+
+            for chunk in response:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+                reasoning_part = getattr(delta, "reasoning_content", None) or ""
+                content_part = getattr(delta, "content", None) or ""
+                if reasoning_part:
+                    # 检测到在思考
+                    if not is_thinking:
+                        cur_io.IO_s_output("开始思考...\n")
+                        is_thinking = True
+                    # 输出思考部分，将思考部分加到结果里去
+                    cur_io.IO_s_output(reasoning_part)
+                    collected_reasoning.append(reasoning_part)
+                elif content_part:
+                    # 检测到没在思考
+                    if is_thinking:
+                        cur_io.IO_s_output("\n思考结束...\n")
+                        is_thinking = False
+                    # 输出正文部分，将正文部分加到结果里去
+                    cur_io.IO_s_output(content_part)
+                    collected_content.append(content_part)
+            cur_io.IO_output("")
+
+            full_reasoning = "".join(collected_reasoning)  # 说不定会有用
+            full_content = "".join(collected_content)
+
+            return full_reasoning, full_content
+
         sleep(1)
 
+        visible_ids = get_visibles()
+        message_and_time = get_prompts()
+        response = get_model_response()
+        full_reasoning, full_content = get_final_content(response)
+
         if if_pub:
-            # 全体
-            visible_ids = self.game.get_players("id", alive=False)
-        elif if_faction:
-            # 同阵营
-            visible_ids = [self.id, 0] + self.game.get_players_by_factions(
-                "id", faction=LEGAL_ROLE[self.role]
-            )
-        elif if_self:
-            # 同职责
-            visible_ids = [self.id, 0] + self.game.get_players("id", role=self.role)
-        else:
-            # 仅自己
-            visible_ids = [self.id, 0]
+            full_content = "【公共频道发言】" + full_content
 
-        pub_messages = Context.get_context(self.id, self.game)
-        prompt0 = prompt
-        if if_pub:
-            prompt = (
-                prompt
-                + f"\n此前你能得知的玩家发言以及公共信息如下：{str(pub_messages)}。注意：你现在在公共发言阶段，你的**所有输出**都会被**所有玩家**听到，此阶段不允许私聊。如果你有想要隐瞒的信息，请不要暴露你的意图，同理，也不要太信任他人在公共频道说的话。你不允许使用任何括号括住你的任何发言。"
-            )
-        else:
-            prompt = (
-                prompt
-                + f"\n此前你能得知的玩家发言以及公共信息如下：{str(pub_messages)}。注意：你现在在私聊阶段，你的输出只会被上帝听到。如果你是狼人，你的聊天还会被同阵营的玩家听到。"
-            )
+        Context(self.game, self.id, full_content, visible_ids)
 
-        self.messages.append({"role": "user", "content": prompt})
-
-        message_and_time = self.messages.copy()
-
-        message_and_time.append({"role": "system", "content": f"现在是{self.game}。"})
-
-        # cur_io.IO_output(f"{self} 的上下文： {message_and_time}")
-
-        times = 0
-        while times < 3:
-            try:
-                response = self.client.chat.completions.create(
-                    model=self.game.apis[self.using_preset]["model_name"],
-                    messages=message_and_time,
-                    stream=True,
-                )
-                self.messages[-1]["content"] = prompt0
-                break
-            except:
-                times += 1
-                sleep(5)
-
-        collected_messages = ""
-        reasoning_messages = ""
-        reasoning_model = -1
-        cur_io.IO_s_output(f"玩家{self.id}（{self.role}）： ")
-        for chunk in response:
-            if reasoning_model == -1:
-                try:
-                    reasoning_message = chunk.choices[0].delta.reasoning_content
-                    reasoning_messages += reasoning_message
-                    reasoning_model = 1
-                    reasoning = True
-                    cur_io.IO_s_output("思考中...\n")
-                    cur_io.IO_s_output(reasoning_message)
-                except:
-                    reasoning_model = 0
-                    chunk_message = chunk.choices[0].delta.content
-                    collected_messages += chunk_message
-                    cur_io.IO_s_output(chunk_message)
-            elif reasoning_model == 1:
-                reasoning_message = chunk.choices[0].delta.reasoning_content
-                chunk_message = chunk.choices[0].delta.content
-                if reasoning_message and reasoning:
-                    reasoning_messages += reasoning_message
-                    cur_io.IO_s_output(reasoning_message)
-                elif not reasoning_message and reasoning and chunk_message:
-                    cur_io.IO_s_output("\n思考结束...\n")
-                    reasoning = False
-                    collected_messages += chunk_message
-                    cur_io.IO_s_output(chunk_message)
-                elif not reasoning:
-                    collected_messages += chunk_message
-                    cur_io.IO_s_output(chunk_message)
-            else:
-                chunk_message = chunk.choices[0].delta.content
-                collected_messages += chunk_message
-                cur_io.IO_s_output(chunk_message)
-
-        cur_io.IO_output("")
-        collected_messages = (
-            "<think>" + reasoning_messages + "</think>" + collected_messages
-            if reasoning_messages
-            else collected_messages
-        )
-        if if_pub:
-            collected_messages = "【公共频道发言】" + collected_messages
-
-        Context(self.game, self.id, collected_messages, visible_ids)
-
-        self.messages.append({"role": "assistant", "content": collected_messages})
+        self.messages.append({"role": "assistant", "content": full_content})
 
     def init_role_special(self):
         """根据角色初始化特殊属性。
