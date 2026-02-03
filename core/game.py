@@ -1,4 +1,8 @@
+# core/game.py
+
+
 from time import time
+from random import randint
 from .tools import (
     read_json,
     find_max_key,
@@ -8,8 +12,8 @@ from .tools import (
 from .context import Context
 from .player import Player
 from .basic_game import BasicGame
+from .io import cur_io
 from .general import *
-from random import randint
 
 
 class Game(BasicGame):
@@ -417,9 +421,9 @@ class Game(BasicGame):
                             )
                             self.died(parasite, ways)
                         else:
-                            print(1 / 0)
+                            do_a_error = 1 / 0
                     else:
-                        print(1 / 0)
+                        do_a_error = 1 / 0
                 except:
                     self.died(outed_player, ways)
 
@@ -488,7 +492,7 @@ class Game(BasicGame):
                     f"游戏结束，白狼获胜",
                     self.get_players(t="id", alive=False),
                 )
-                print("【系统】游戏结束！白狼独赢。")
+                cur_io.CLI_output("【系统】游戏结束！白狼独赢。")
                 return "白狼"
             else:
                 Context(
@@ -497,7 +501,7 @@ class Game(BasicGame):
                     f"游戏结束，狼人获胜",
                     self.get_players(t="id", alive=False),
                 )
-                print("【系统】游戏结束！狼人阵营获胜。")
+                cur_io.CLI_output("【系统】游戏结束！狼人阵营获胜。")
                 return "狼人"
         elif bad_people == 0:
             Context(
@@ -506,7 +510,7 @@ class Game(BasicGame):
                 f"游戏结束，好人获胜",
                 self.get_players(t="id", alive=False),
             )
-            print("【系统】游戏结束！好人阵营获胜。")
+            cur_io.CLI_output("【系统】游戏结束！好人阵营获胜。")
             return "好人"
         return None
 
@@ -520,5 +524,5 @@ class Game(BasicGame):
         """
         match (way):
             case "joker":
-                print("【系统】游戏结束！小丑单独获胜。")
+                cur_io.CLI_output("【系统】游戏结束！小丑单独获胜。")
                 self.gg = True

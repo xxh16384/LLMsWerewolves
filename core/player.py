@@ -1,6 +1,10 @@
+# core/player.py
+
+
 from time import sleep
 from .context import Context
-from core.general import *
+from .io import cur_io
+from .general import *
 
 
 class Player:
@@ -78,7 +82,7 @@ class Player:
         else:
             Context(self.game, source_id, f"{content}", [self.id])
             if not self.game.webui_mode:
-                print(f"{source_id}号玩家：{content}")
+                cur_io.CLI_output(f"{source_id}号玩家：{content}")
             self.get_response(
                 f"{source_id}号玩家：{content}", False, if_faction=faction
             )
@@ -142,7 +146,7 @@ class Player:
 
         message_and_time.append({"role": "system", "content": f"现在是{self.game}。"})
 
-        # print(f"{self} 的上下文： {message_and_time}")
+        # cur_io.CLI_output(f"{self} 的上下文： {message_and_time}")
 
         times = 0
         while times < 3:
@@ -161,7 +165,7 @@ class Player:
         collected_messages = ""
         reasoning_messages = ""
         reasoning_model = -1
-        print(f"玩家{self.id}（{self.role}）： ", end="", flush=True)
+        cur_io.CLI_output(f"玩家{self.id}（{self.role}）： ", end="", flush=True)
         for chunk in response:
             if reasoning_model == -1:
                 try:
@@ -169,33 +173,33 @@ class Player:
                     reasoning_messages += reasoning_message
                     reasoning_model = 1
                     reasoning = True
-                    print("思考中...\n", end="", flush=True)
-                    print(reasoning_message, end="", flush=True)
+                    cur_io.CLI_output("思考中...\n", end="", flush=True)
+                    cur_io.CLI_output(reasoning_message, end="", flush=True)
                 except:
                     reasoning_model = 0
                     chunk_message = chunk.choices[0].delta.content
                     collected_messages += chunk_message
-                    print(chunk_message, end="", flush=True)
+                    cur_io.CLI_output(chunk_message, end="", flush=True)
             elif reasoning_model == 1:
                 reasoning_message = chunk.choices[0].delta.reasoning_content
                 chunk_message = chunk.choices[0].delta.content
                 if reasoning_message and reasoning:
                     reasoning_messages += reasoning_message
-                    print(reasoning_message, end="", flush=True)
+                    cur_io.CLI_output(reasoning_message, end="", flush=True)
                 elif not reasoning_message and reasoning and chunk_message:
-                    print("\n思考结束...\n")
+                    cur_io.CLI_output("\n思考结束...\n")
                     reasoning = False
                     collected_messages += chunk_message
-                    print(chunk_message, end="", flush=True)
+                    cur_io.CLI_output(chunk_message, end="", flush=True)
                 elif not reasoning:
                     collected_messages += chunk_message
-                    print(chunk_message, end="", flush=True)
+                    cur_io.CLI_output(chunk_message, end="", flush=True)
             else:
                 chunk_message = chunk.choices[0].delta.content
                 collected_messages += chunk_message
-                print(chunk_message, end="", flush=True)
+                cur_io.CLI_output(chunk_message, end="", flush=True)
 
-        print("")
+        cur_io.CLI_output("")
         collected_messages = (
             "<think>" + reasoning_messages + "</think>" + collected_messages
             if reasoning_messages

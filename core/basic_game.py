@@ -1,6 +1,10 @@
+# core/basic_game.py
+
+
 import logging
 import os
 from random import choice
+from openai import OpenAI
 from .tools import (
     find_max_key,
     makeDic,
@@ -8,7 +12,7 @@ from .tools import (
 )
 from .context import Context
 from .player import Player
-from openai import OpenAI
+from .io import cur_io
 from .general import *
 
 
@@ -46,7 +50,9 @@ class BasicGame:
                 line_num = 100 - len(routine[0][1]) * 2
                 left_line_num = line_num // 2
                 right_line_num = line_num - left_line_num
-                print(f"{"—"*left_line_num} {routine[0][1]} {"—"*right_line_num}")
+                cur_io.CLI_output(
+                    f"{"—"*left_line_num} {routine[0][1]} {"—"*right_line_num}"
+                )
                 routine[0][0]()
 
     def init_role_prompts(self):
