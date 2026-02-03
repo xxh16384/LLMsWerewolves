@@ -20,13 +20,13 @@ def api_template_check(apis_path) -> None:
     """
     try:
         apis = read_json(apis_path)
-        cur_io.CLI_output(
+        cur_io.IO_output(
             "\n ——————————————————\
              \n 检测到可用api预设，\
              \n 你可以忽略此条提示。"
         )
     except:
-        cur_io.CLI_output(
+        cur_io.IO_output(
             "\n ————————————————————\
              \n 未检测到可用api预设，\
              \n 进入辅助填充阶段。\
@@ -38,7 +38,7 @@ def api_template_check(apis_path) -> None:
         api_key = "None"
         api_model = "None"
         while True:
-            cur_io.CLI_output(
+            cur_io.IO_output(
                 f"\n ————————————————————\
                   \n 当前正在记录的api预设信息：\
                   \n  1: 预设名：{api_preset}\
@@ -49,38 +49,38 @@ def api_template_check(apis_path) -> None:
                   \n  0: 完成这份api预设填写\
                   \n -1: 完成所有api预设信息填写"
             )
-            choice = cur_io.CLI_input("输入对应数字以更新信息：")
+            choice = cur_io.IO_input("输入对应数字以更新信息：")
             match (choice):
                 case "1":
-                    api_preset = cur_io.CLI_input(
+                    api_preset = cur_io.IO_input(
                         f"当前预设名字(自定义，仅用于和player对应，不可为-1)："
                     )
                     while api_preset == -1:
-                        api_preset = cur_io.CLI_input(
+                        api_preset = cur_io.IO_input(
                             f"当前号预设名字(自定义，仅用于和player对应，不可为-1)："
                         )
                 case "2":
-                    api_url = cur_io.CLI_input(
+                    api_url = cur_io.IO_input(
                         f"当前号预设所使用api的url(请使用openai兼容格式)："
                     )
                 case "3":
-                    api_key = cur_io.CLI_input(
+                    api_key = cur_io.IO_input(
                         f"当前号预设所使用api的密钥(仅保存在本地，不会上传到云端)："
                     )
                 case "4":
-                    api_model = cur_io.CLI_input(
+                    api_model = cur_io.IO_input(
                         f"当前号预设所使用api的模型(输出完整名字，输入-1以查询当前api所有模型(WIP))："
                     )
                 case "9":
                     print_json(apis)
-                    choice2 = cur_io.CLI_input(
+                    choice2 = cur_io.IO_input(
                         "若有想要删除的api预set，在此输入那个预设的名字，否则输入-1。"
                     )
                     if choice2 != -1:
                         try:
                             del apis[choice2]
                         except:
-                            cur_io.CLI_output("想要删除的预设不存在，已经自动跳出")
+                            cur_io.IO_output("想要删除的预设不存在，已经自动跳出")
                 case "0":
                     each_api = {
                         "api_key": api_key,
@@ -99,7 +99,7 @@ def api_template_check(apis_path) -> None:
                             f.write(apis_json)
                         break
                     except:
-                        cur_io.CLI_output("写入json失败，我也不知道什么问题，自检吧")
+                        cur_io.IO_output("写入json失败，我也不知道什么问题，自检吧")
 
 
 def api_players_check(apis_path, api_players_path) -> None:
@@ -117,13 +117,13 @@ def api_players_check(apis_path, api_players_path) -> None:
     apis = read_json(apis_path)
     try:
         players = read_json(api_players_path)
-        cur_io.CLI_output(
+        cur_io.IO_output(
             "\n ——————————————————\
              \n 检测到可用Player预设，\
              \n 你可以忽略此条提示。"
         )
     except:
-        cur_io.CLI_output(
+        cur_io.IO_output(
             "\n ————————————————————\
              \n 未检测到可用Player预设，\
              \n 进入辅助填充阶段。\
@@ -133,7 +133,7 @@ def api_players_check(apis_path, api_players_path) -> None:
         player_id = 1
         player_preset = "None"
         while True:
-            cur_io.CLI_output(
+            cur_io.IO_output(
                 f"\n ————————————————————\
                   \n 请填写{player_id}号Player对应的预设的信息，\
                   \n 当前正在记录的Player预设信息：\
@@ -143,10 +143,10 @@ def api_players_check(apis_path, api_players_path) -> None:
                   \n  0: 完成这份Player预设填写\
                   \n -1: 完成所有Player预设信息填写"
             )
-            choice = cur_io.CLI_input("输入对应数字以更新信息：")
+            choice = cur_io.IO_input("输入对应数字以更新信息：")
             match (choice):
                 case "1":
-                    player_preset = cur_io.CLI_input(
+                    player_preset = cur_io.IO_input(
                         f"{player_id}号Player对应的预设名字："
                     )
                 case "8":
@@ -165,7 +165,7 @@ def api_players_check(apis_path, api_players_path) -> None:
                             f.write(player_json)
                         break
                     except:
-                        cur_io.CLI_output("写入json失败，我也不知道什么问题，自检吧")
+                        cur_io.IO_output("写入json失败，我也不知道什么问题，自检吧")
 
 
 def roles_divided(api_players_path) -> dict:
@@ -206,15 +206,20 @@ def roles_divided(api_players_path) -> dict:
         return f"成功减少一个{PLAYERDIC[role]}"
 
     def make_role(choice):
-        if len(choice) == 1:
-            role = ROLE_INDEX[choice]
-            cur_io.CLI_output(add_role(role))
-        elif len(choice) == 2:
-            choice = choice[1]
-            role = ROLE_INDEX[choice]
-            cur_io.CLI_output(remove_role(role))
-        else:
-            cur_io.CLI_output("无效输入。")
+        try:
+            if len(choice) == 1:
+                role = ROLE_INDEX[choice]
+                cur_io.IO_output(add_role(role))
+                return
+            elif len(choice) == 2:
+                choice = choice[1]
+                role = ROLE_INDEX[choice]
+                cur_io.IO_output(remove_role(role))
+                return
+        except:
+            cur_io.IO_output("无效输入。")
+            return
+        cur_io.IO_output("无效输入。")
 
     def get_role_by_faction(faction):
         return [role for role in LEGAL_ROLE.keys() if LEGAL_ROLE[role] == faction]
@@ -257,22 +262,22 @@ def roles_divided(api_players_path) -> dict:
         good_guy = count(goods)
         neutral_guy = count(neutral)
 
-        cur_io.CLI_output(
+        cur_io.IO_output(
             f"\n ——————————————————\
               \n 请输入这一局的职业划分，\
               \n [a/b]中，a代表加1人，b代表减1人"
         )
         for role in LEGAL_ROLE.keys():
-            cur_io.CLI_output(roles_divided_string(role))
-        cur_io.CLI_output(f"\n [0]    完成职业划分")
+            cur_io.IO_output(roles_divided_string(role))
+        cur_io.IO_output(f"\n [0]    完成职业划分")
 
-        choice = cur_io.CLI_input("请输入：")
+        choice = cur_io.IO_input("请输入：")
 
         if choice == "0":
             if good_guy >= bad_guy + neutral_guy:
                 break
             else:
-                cur_io.CLI_output("好人数量太少了！至少要和坏人加中立职业的数量一样！")
+                cur_io.IO_output("好人数量太少了！至少要和坏人加中立职业的数量一样！")
         else:
             make_role(choice)
 

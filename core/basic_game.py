@@ -50,7 +50,7 @@ class BasicGame:
                 line_num = 100 - len(routine[0][1]) * 2
                 left_line_num = line_num // 2
                 right_line_num = line_num - left_line_num
-                cur_io.CLI_output(
+                cur_io.IO_output(
                     f"{"—"*left_line_num} {routine[0][1]} {"—"*right_line_num}"
                 )
                 routine[0][0]()
