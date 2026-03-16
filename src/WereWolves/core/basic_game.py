@@ -1,19 +1,15 @@
 # core/basic_game.py
 
 
+from WereWolves.core.context import Context
+from WereWolves.core.player import Player
+from WereWolves.utils.io import cur_io
+from WereWolves.utils.tools import find_max_key, makeDic, read_reply
+from WereWolves.utils.general import *
 import logging
 import os
 from random import choice
 from openai import OpenAI
-from .tools import (
-    find_max_key,
-    makeDic,
-    read_reply,
-)
-from .context import Context
-from .player import Player
-from .io import cur_io
-from .general import *
 
 
 class BasicGame:

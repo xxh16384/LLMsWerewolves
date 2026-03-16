@@ -1,19 +1,19 @@
 # core/game.py
 
 
-from time import time
-from random import randint
-from .tools import (
+from WereWolves.core.context import Context
+from WereWolves.core.player import Player
+from WereWolves.core.basic_game import BasicGame
+from WereWolves.utils.tools import (
     read_json,
     find_max_key,
     makeDic,
     read_reply,
 )
-from .context import Context
-from .player import Player
-from .basic_game import BasicGame
-from .io import cur_io
-from .general import *
+from WereWolves.utils.io import cur_io
+from WereWolves.utils.general import *
+from time import time
+from random import randint
 
 
 class Game(BasicGame):

@@ -17,7 +17,14 @@
 胜利方并终止程序。用户也可以随时输入 `-1` 来手动结束游戏。
 """
 
-from core import *
+from WereWolves.core.init import (
+    api_players_check,
+    api_template_check,
+    roles_divided,
+    role_json_made,
+)
+from src.WereWolves.utils.io import cur_io
+from WereWolves.core.game import Game
 from time import sleep
 import os
 

@@ -1,10 +1,10 @@
 # core/player.py
 
 
+from WereWolves.core.context import Context
+from WereWolves.utils.io import cur_io
+from WereWolves.utils.general import *
 from time import sleep
-from .context import Context
-from .io import cur_io
-from .general import *
 
 
 class Player:

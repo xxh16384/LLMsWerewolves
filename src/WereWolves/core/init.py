@@ -1,10 +1,10 @@
 # core/init.py
 
 
+from WereWolves.utils.tools import read_json, print_json
+from WereWolves.utils.io import cur_io
+from WereWolves.utils.general import *
 import json
-from .tools import read_json, print_json
-from .io import cur_io
-from .general import *
 
 
 def api_template_check(apis_path) -> None:
