@@ -1,5 +1,30 @@
-/config/apis.json
-/__pycache__
-test.py
-LLMsWerewolves.code-workspace
+# —————————— 清除所有log文件————————————#
 /log
+# —————————— 清除所有log文件————————————#
+
+
+# —————————— 清除所有隐私文件———————————#
+config/api_template.json
+config/api_players.json
+config/instructions.json
+# —————————— 清除所有隐私文件———————————#
+
+
+# ——————————  清除所有测试文件 ——————————#
+test.py
+/test
+LLMsWerewolves.code-workspace
+# ——————————  清除所有测试文件 ——————————#
+
+
+# ——————————清除所有pycache缓存——————————#
+*.pyc
+web_ui/common/__pycache__/
+core/__pycache__
+/__pycache__
+# ——————————清除所有pycache缓存——————————#
+
+
+# —————————— 清除vscode配置文件——————————#
+/.vscode
+# —————————— 清除vscode配置文件——————————#
